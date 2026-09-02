@@ -10,6 +10,14 @@
 
 > 大切な人たちと以前訪れた場所へ再び近づいたとき、その場で撮った写真を見て、当時の記憶が走馬灯のように蘇る。
 
+## 開発コマンド
+
+- `npm install` — ロックファイルに従って依存関係をインストールする。
+- `npm run start` — Expo開発サーバーを起動する。
+- `npm run lint` — Expo・React Native・TypeScript向けのLintを実行する。
+- `npm run format:check` — Prettierのフォーマット規約への適合を確認する。
+- `npm run typecheck` — ファイルを生成せずにTypeScriptの型を検査する。
+
 ---
 
 ## 1. プロダクト概要
@@ -199,16 +207,16 @@ GPS偽装など、意図的なチートへの高度な対策はMVPでは行わ�
 
 ## 6. 推奨技術スタック
 
-| 役割 | 技術 | 用途 |
-| --- | --- | --- |
-| モバイルフロントエンド | React Native + Expo + TypeScript | iOS / Androidアプリ、カメラ、現在地取得 |
-| 地図 | Google Maps SDK | 地図と跡地アイコンの表示 |
-| 認証・DB | Supabase Auth + PostgreSQL | ユーザー、グループ、招待、跡地情報 |
-| 権限管理 | Supabase Row Level Security (RLS) | グループ外・退出後のユーザーをDB側で遮断 |
-| 特別なサーバー処理 | Supabase Edge Functions | 距離判定、署名URL発行、削除処理 |
-| 写真ストレージ | Cloudflare R2 | 写真ファイルの保存 |
-| 位置検索 | PostGIS | 50m以内の跡地統合と150m／500mの開封判定 |
-| アプリ配布 | Expo EAS Build | TestFlight / Google Play / App Store向けビルド |
+| 役割                   | 技術                              | 用途                                           |
+| ---------------------- | --------------------------------- | ---------------------------------------------- |
+| モバイルフロントエンド | React Native + Expo + TypeScript  | iOS / Androidアプリ、カメラ、現在地取得        |
+| 地図                   | Google Maps SDK                   | 地図と跡地アイコンの表示                       |
+| 認証・DB               | Supabase Auth + PostgreSQL        | ユーザー、グループ、招待、跡地情報             |
+| 権限管理               | Supabase Row Level Security (RLS) | グループ外・退出後のユーザーをDB側で遮断       |
+| 特別なサーバー処理     | Supabase Edge Functions           | 距離判定、署名URL発行、削除処理                |
+| 写真ストレージ         | Cloudflare R2                     | 写真ファイルの保存                             |
+| 位置検索               | PostGIS                           | 50m以内の跡地統合と150m／500mの開封判定        |
+| アプリ配布             | Expo EAS Build                    | TestFlight / Google Play / App Store向けビルド |
 
 MVPではRails APIやRenderの常時稼働サーバーは使わない。Supabaseが認証・DB・基本APIの役割を担い、Edge Functionsが必要なバックエンド処理を担う。
 
