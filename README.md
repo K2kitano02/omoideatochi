@@ -18,6 +18,17 @@
 - `npm run format:check` — Prettierのフォーマット規約への適合を確認する。
 - `npm run typecheck` — ファイルを生成せずにTypeScriptの型を検査する。
 
+### Supabaseローカル開発
+
+Docker Desktopを起動してから、次のコマンドを使用する。
+
+- `npm run supabase:start` — ローカルSupabaseを起動し、マイグレーションを適用する。
+- `npm run supabase:status` — ローカルSupabaseの稼働状態と接続情報を確認する。
+- `npm run supabase:reset` — ローカルDBを削除し、全マイグレーションを先頭から再適用する。
+- `npm run supabase:stop` — ローカルSupabaseを停止する。
+
+`npm run supabase:reset`はローカルDB内の手入力データを削除する。本番環境を対象にする`--linked`オプションは、通常のローカル開発では使用しない。
+
 ---
 
 ## 1. プロダクト概要
