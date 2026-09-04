@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 
 type AuthAutoRefresh = {
-  startAutoRefresh: () => unknown;
-  stopAutoRefresh: () => unknown;
+  initialize: () => Promise<unknown>;
+  startAutoRefresh: () => Promise<unknown> | unknown;
+  stopAutoRefresh: () => Promise<unknown> | unknown;
 };
 
 type AppStateSource = {
@@ -22,33 +23,63 @@ export const createSupabaseAuthLifecycle = (
   appState: AppStateSource = AppState,
 ) => {
   let subscription: NativeEventSubscription | undefined;
+  let startPromise: Promise<void> | undefined;
 
-  const updateAutoRefresh = (state: AppStateStatus) => {
+  const updateAutoRefresh = async (state: AppStateStatus) => {
     if (state === 'active') {
-      auth.startAutoRefresh();
+      await auth.startAutoRefresh();
       return;
     }
 
-    auth.stopAutoRefresh();
+    await auth.stopAutoRefresh();
   };
 
   return {
     start: () => {
-      if (subscription) {
-        return;
+      if (startPromise) {
+        return startPromise;
       }
 
-      updateAutoRefresh(appState.currentState);
-      subscription = appState.addEventListener('change', updateAutoRefresh);
+      subscription = appState.addEventListener('change', (state) => {
+        void updateAutoRefresh(state);
+      });
+      startPromise = (async () => {
+        await auth.initialize();
+        await updateAutoRefresh(appState.currentState);
+      })();
+
+      return startPromise;
     },
-    stop: () => {
+    stop: async () => {
       if (!subscription) {
         return;
       }
 
+      await startPromise;
       subscription.remove();
       subscription = undefined;
-      auth.stopAutoRefresh();
+      startPromise = undefined;
+      await auth.stopAutoRefresh();
     },
   };
+};
+
+type SupabaseAuthLifecycle = ReturnType<typeof createSupabaseAuthLifecycle>;
+
+let sharedLifecycle: SupabaseAuthLifecycle | undefined;
+
+export const initializeSupabaseAuthLifecycle = (
+  auth: AuthAutoRefresh,
+  appState: AppStateSource = AppState,
+): SupabaseAuthLifecycle => {
+  sharedLifecycle ??= createSupabaseAuthLifecycle(auth, appState);
+  void sharedLifecycle.start();
+
+  return sharedLifecycle;
+};
+
+export const disposeSupabaseAuthLifecycle = async (): Promise<void> => {
+  const lifecycle = sharedLifecycle;
+  sharedLifecycle = undefined;
+  await lifecycle?.stop();
 };
