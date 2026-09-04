@@ -7,6 +7,8 @@ const restoreEnvValue = (name: string, value: string | undefined) => {
   process.env[name] = value;
 };
 
+jest.mock('expo-sqlite/localStorage/install', () => ({}));
+
 describe('app entry', () => {
   const originalSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const originalSupabasePublishableKey =

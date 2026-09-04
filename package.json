@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
     "expo": "~57.0.18",
+    "expo-asset": "~57.0.16",
+    "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-url-polyfill": "^4.0.0"
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.0.1",
