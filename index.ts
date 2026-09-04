@@ -1,8 +1,11 @@
 import { registerRootComponent } from 'expo';
 
 import App from './App';
-import { getEnv } from './src/config/env';
+import { getSupabaseClient } from './src/lib/supabase';
+import { initializeSupabaseAuthLifecycle } from './src/lib/supabaseAuthLifecycle';
 
-getEnv();
+const supabase = getSupabaseClient();
+
+initializeSupabaseAuthLifecycle(supabase.auth);
 
 registerRootComponent(App);
