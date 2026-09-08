@@ -1,16 +1,161 @@
-import { render, screen } from '@testing-library/react-native';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
-import App from '../App';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+
+import { AppContent } from '../App';
+import type { AuthStateClient } from '../src/features/auth/useAuthSession';
 
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
 
-describe('<App />', () => {
-  test('初期画面にログインフォームを表示する', async () => {
-    await render(<App />);
+const session: Session = {
+  access_token: 'access-token-must-not-be-rendered',
+  token_type: 'bearer',
+  expires_in: 3600,
+  expires_at: 1_800_000_000,
+  refresh_token: 'refresh-token-must-not-be-rendered',
+  user: {
+    id: '11111111-1111-1111-1111-111111111111',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'user@example.com',
+    email_confirmed_at: '2026-09-06T00:00:00.000Z',
+    phone: '',
+    confirmed_at: '2026-09-06T00:00:00.000Z',
+    last_sign_in_at: '2026-09-06T00:00:00.000Z',
+    app_metadata: { provider: 'email', providers: ['email'] },
+    user_metadata: {},
+    identities: [],
+    created_at: '2026-09-06T00:00:00.000Z',
+    updated_at: '2026-09-06T00:00:00.000Z',
+    is_anonymous: false,
+  },
+};
 
-    expect(screen.getByText('思い出跡地')).toBeTruthy();
+const createAuthClient = () => {
+  let callback:
+    | ((event: AuthChangeEvent, currentSession: Session | null) => void)
+    | undefined;
+  const unsubscribe = jest.fn();
+  const onAuthStateChange = jest.fn((nextCallback) => {
+    callback = nextCallback;
+
+    return { data: { subscription: { unsubscribe } } };
+  });
+  const authClient: AuthStateClient = {
+    onAuthStateChange,
+  };
+
+  return {
+    authClient,
+    emit: async (
+      currentSession: Session | null,
+      event: AuthChangeEvent = 'INITIAL_SESSION',
+    ) => {
+      await act(async () => {
+        callback?.(event, currentSession);
+      });
+    },
+    onAuthStateChange,
+    unsubscribe,
+  };
+};
+
+describe('<AppContent />', () => {
+  test('初期セッションの確認中は認証画面を表示しない', async () => {
+    const { authClient } = createAuthClient();
+
+    await render(<AppContent authClient={authClient} />);
+
+    expect(screen.getByLabelText('認証状態を確認中')).toBeTruthy();
+    expect(screen.queryByLabelText('メールアドレス')).toBeNull();
+  });
+
+  test('初期セッションがなければ認証画面を表示する', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+
+    await emit(null);
+
     expect(screen.getByLabelText('メールアドレス')).toBeTruthy();
-    expect(screen.getByLabelText('パスワード')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'ログイン' })).toBeTruthy();
+  });
+
+  test('初期セッションがあればログイン後の画面を表示する', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+
+    await emit(session);
+
+    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+    expect(screen.getByText('user@example.com でログイン中')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'ログアウト' })).toBeTruthy();
+    expect(screen.queryByLabelText('メールアドレス')).toBeNull();
+  });
+
+  test('ログインイベントを受け取ると認証画面からログイン後の画面へ切り替える', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(null);
+
+    await emit(session, 'SIGNED_IN');
+
+    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+  });
+
+  test('ログアウト後の認証イベントで認証画面へ戻る', async () => {
+    const { authClient, emit } = createAuthClient();
+    const authService = {
+      signOut: jest.fn().mockResolvedValue({ ok: true } as const),
+    };
+    await render(
+      <AppContent authClient={authClient} authService={authService} />,
+    );
+    await emit(session);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
+
+    expect(authService.signOut).toHaveBeenCalledTimes(1);
+    await emit(null, 'SIGNED_OUT');
+    expect(screen.getByRole('button', { name: 'ログイン' })).toBeTruthy();
+  });
+
+  test('ログアウトに失敗したらログイン状態を保って安全なエラーを表示する', async () => {
+    const { authClient, emit } = createAuthClient();
+    const authService = {
+      signOut: jest.fn().mockResolvedValue({
+        ok: false,
+        error: {
+          type: 'network' as const,
+          message: '通信に失敗しました。接続を確認して再度お試しください。',
+        },
+      }),
+    };
+    await render(
+      <AppContent authClient={authClient} authService={authService} />,
+    );
+    await emit(session);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
+
+    expect(authService.signOut).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText(
+        '通信に失敗しました。接続を確認して再度お試しください。',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+  });
+
+  test('認証監視を重複登録せず、アプリのアンマウント時に解除する', async () => {
+    const { authClient, onAuthStateChange, unsubscribe } = createAuthClient();
+    const view = await render(<AppContent authClient={authClient} />);
+
+    await view.rerender(<AppContent authClient={authClient} />);
+
+    expect(onAuthStateChange).toHaveBeenCalledTimes(1);
+
+    await view.unmount();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });
