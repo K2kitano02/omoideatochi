@@ -1,41 +1,32 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { AuthSessionUser } from '../features/auth/useAuthSession';
 
-type AuthenticatedScreenProps = {
+type SettingsScreenProps = {
   user: AuthSessionUser;
   error: string | null;
   isSigningOut: boolean;
   onSignOut: () => Promise<void>;
 };
 
-export const AuthenticatedScreen = ({
+export const SettingsScreen = ({
   user,
   error,
   isSigningOut,
   onSignOut,
-}: AuthenticatedScreenProps) => (
-  <ScrollView
-    contentContainerStyle={styles.content}
-    keyboardShouldPersistTaps="handled"
-    style={styles.screen}
-  >
-    <View accessibilityElementsHidden style={styles.placeMark}>
-      <View style={styles.placeRingOuter} />
-      <View style={styles.placeRingInner} />
-      <View style={styles.placeCore} />
-    </View>
-
-    <Text style={styles.brand}>思い出跡地</Text>
-    <Text style={styles.tagline}>思い出は、あの場所に残っている。</Text>
+}: SettingsScreenProps) => (
+  <SafeAreaView accessibilityLabel="設定画面" style={styles.screen}>
+    <Text style={styles.eyebrow}>ACCOUNT</Text>
+    <Text accessibilityRole="header" style={styles.title}>
+      設定
+    </Text>
+    <Text style={styles.description}>
+      ログイン中のアカウントとセッションを管理します。
+    </Text>
 
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>MEMORY KEEPER</Text>
-      <Text style={styles.heading}>思い出を探しに行こう</Text>
-      <Text style={styles.description}>
-        この先に、みんなで残す思い出の場所が集まります。
-      </Text>
-
+      <Text style={styles.cardLabel}>ログイン中のアカウント</Text>
       <View style={styles.accountBadge}>
         <View accessibilityElementsHidden style={styles.accountDot} />
         <Text style={styles.accountText}>
@@ -66,106 +57,52 @@ export const AuthenticatedScreen = ({
         </View>
       ) : null}
     </View>
-  </ScrollView>
+  </SafeAreaView>
 );
 
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: '#0B2638',
     flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 48,
+    paddingTop: 28,
   },
-  placeMark: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    height: 80,
-    justifyContent: 'center',
-    marginBottom: 22,
-    width: 80,
+  eyebrow: {
+    color: '#E7A84B',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
-  placeRingOuter: {
-    borderColor: 'rgba(231, 168, 75, 0.25)',
-    borderRadius: 40,
-    borderWidth: 1,
-    height: 80,
-    position: 'absolute',
-    width: 80,
-  },
-  placeRingInner: {
-    borderColor: 'rgba(231, 168, 75, 0.55)',
-    borderRadius: 25,
-    borderWidth: 1,
-    height: 50,
-    position: 'absolute',
-    width: 50,
-  },
-  placeCore: {
-    backgroundColor: '#E7A84B',
-    borderColor: '#FFE1A8',
-    borderRadius: 9,
-    borderWidth: 3,
-    height: 18,
-    shadowColor: '#E7A84B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.65,
-    shadowRadius: 10,
-    width: 18,
-  },
-  brand: {
+  title: {
     color: '#FFFFFF',
     fontSize: 30,
     fontWeight: '800',
-    letterSpacing: 2,
-    textAlign: 'center',
+    marginTop: 8,
   },
-  tagline: {
+  description: {
     color: '#AFC2CF',
-    fontSize: 13,
-    letterSpacing: 0.8,
-    marginTop: 9,
-    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
   },
   card: {
     backgroundColor: '#F6F9FA',
     borderRadius: 24,
-    marginTop: 42,
+    marginTop: 34,
     paddingHorizontal: 22,
-    paddingVertical: 28,
-    shadowColor: '#071723',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.28,
-    shadowRadius: 28,
+    paddingVertical: 26,
   },
-  eyebrow: {
-    color: '#B37320',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.8,
-  },
-  heading: {
+  cardLabel: {
     color: '#102B3D',
-    fontSize: 25,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.4,
-    marginTop: 8,
-  },
-  description: {
-    color: '#596D79',
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 10,
   },
   accountBadge: {
     alignItems: 'center',
     backgroundColor: '#E8EFF2',
     borderRadius: 12,
     flexDirection: 'row',
-    marginTop: 24,
+    marginTop: 18,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
