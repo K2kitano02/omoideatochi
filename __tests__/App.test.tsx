@@ -6,6 +6,15 @@ import { AppContent } from '../App';
 import type { AuthStateClient } from '../src/features/auth/useAuthSession';
 
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
+jest.mock('../src/features/groups/groups', () => ({
+  getGroupService: () => ({
+    createGroup: jest.fn().mockResolvedValue({
+      ok: true,
+      groupId: '33333333-3333-3333-3333-333333333333',
+    }),
+    listGroups: jest.fn().mockResolvedValue({ ok: true, groups: [] }),
+  }),
+}));
 
 const session: Session = {
   access_token: 'access-token-must-not-be-rendered',
