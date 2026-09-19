@@ -12,7 +12,33 @@ jest.mock('../src/features/groups/groups', () => ({
       ok: true,
       groupId: '33333333-3333-3333-3333-333333333333',
     }),
-    listGroups: jest.fn().mockResolvedValue({ ok: true, groups: [] }),
+    getGroupDetails: jest.fn().mockResolvedValue({
+      ok: true,
+      group: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        createdBy: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001',
+        createdAt: '2026-09-19T00:00:00.000Z',
+        members: [
+          {
+            userId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001',
+            role: 'owner',
+            joinedAt: '2026-09-19T00:00:00.000Z',
+          },
+        ],
+      },
+    }),
+    listGroups: jest.fn().mockResolvedValue({
+      ok: true,
+      groups: [
+        {
+          id: '40000000-0000-0000-0000-000000000001',
+          name: '家族',
+          createdBy: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001',
+          createdAt: '2026-09-19T00:00:00.000Z',
+        },
+      ],
+    }),
   }),
 }));
 
@@ -113,6 +139,26 @@ describe('<AppContent />', () => {
 
     await fireEvent.press(screen.getByLabelText('地図タブ'));
     expect(screen.getByLabelText('地図画面')).toBeTruthy();
+  });
+
+  test('グループ一覧から詳細へ移動し、一覧へ戻れる', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('グループタブ'));
+    await fireEvent.press(
+      await screen.findByRole('button', { name: '家族の詳細を開く' }),
+    );
+
+    expect(await screen.findByLabelText('グループ詳細画面')).toBeTruthy();
+    expect(screen.getByRole('header', { name: '家族' })).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'グループ一覧に戻る' }),
+    );
+
+    expect(await screen.findByLabelText('グループ画面')).toBeTruthy();
   });
 
   test('設定画面でログイン中のアカウントを確認できる', async () => {

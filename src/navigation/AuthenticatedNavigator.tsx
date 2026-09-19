@@ -4,9 +4,9 @@ import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 
 import type { AuthSessionUser } from '../features/auth/useAuthSession';
 import { CollectionScreen } from '../screens/CollectionScreen';
-import { GroupsScreen } from '../screens/GroupsScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { GroupsNavigator } from './GroupsNavigator';
 import type { AuthenticatedTabParamList } from './types';
 
 type AuthenticatedNavigatorProps = {
@@ -79,7 +79,7 @@ export const AuthenticatedNavigator = ({
       })}
     >
       <Tab.Screen component={MapScreen} name="Map" />
-      <Tab.Screen component={GroupsScreen} name="Groups" />
+      <Tab.Screen component={GroupsNavigator} name="Groups" />
       <Tab.Screen component={CollectionScreen} name="Collection" />
       <Tab.Screen name="Settings">
         {() => (
