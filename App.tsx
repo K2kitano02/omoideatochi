@@ -9,8 +9,8 @@ import {
   useAuthSession,
 } from './src/features/auth/useAuthSession';
 import { getSupabaseClient } from './src/lib/supabase';
+import { AuthenticatedNavigator } from './src/navigation/AuthenticatedNavigator';
 import { AuthScreen } from './src/screens/AuthScreen';
-import { AuthenticatedScreen } from './src/screens/AuthenticatedScreen';
 
 type AppProps = {
   authClient?: AuthStateClient;
@@ -55,7 +55,7 @@ export const AppContent = ({
   if (authSession.status === 'authenticated') {
     return (
       <>
-        <AuthenticatedScreen
+        <AuthenticatedNavigator
           error={signOutError}
           isSigningOut={isSigningOut}
           onSignOut={handleSignOut}

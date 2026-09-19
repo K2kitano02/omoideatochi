@@ -80,16 +80,42 @@ describe('<AppContent />', () => {
     expect(screen.getByRole('button', { name: 'ログイン' })).toBeTruthy();
   });
 
-  test('初期セッションがあればログイン後の画面を表示する', async () => {
+  test('初期セッションがあれば地図画面を初期表示する', async () => {
     const { authClient, emit } = createAuthClient();
     await render(<AppContent authClient={authClient} />);
 
     await emit(session);
 
-    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+    expect(screen.getByLabelText('地図画面')).toBeTruthy();
+    expect(screen.queryByLabelText('グループ画面')).toBeNull();
+    expect(screen.queryByLabelText('メールアドレス')).toBeNull();
+  });
+
+  test('認証済みタブから各プレースホルダーへ移動して地図へ戻れる', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('グループタブ'));
+    expect(screen.getByLabelText('グループ画面')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('コレクションタブ'));
+    expect(screen.getByLabelText('コレクション画面')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('地図タブ'));
+    expect(screen.getByLabelText('地図画面')).toBeTruthy();
+  });
+
+  test('設定画面でログイン中のアカウントを確認できる', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('設定タブ'));
+
+    expect(screen.getByLabelText('設定画面')).toBeTruthy();
     expect(screen.getByText('user@example.com でログイン中')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'ログアウト' })).toBeTruthy();
-    expect(screen.queryByLabelText('メールアドレス')).toBeNull();
   });
 
   test('ログインイベントを受け取ると認証画面からログイン後の画面へ切り替える', async () => {
@@ -99,7 +125,7 @@ describe('<AppContent />', () => {
 
     await emit(session, 'SIGNED_IN');
 
-    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+    expect(screen.getByLabelText('地図画面')).toBeTruthy();
   });
 
   test('ログアウト後の認証イベントで認証画面へ戻る', async () => {
@@ -111,6 +137,8 @@ describe('<AppContent />', () => {
       <AppContent authClient={authClient} authService={authService} />,
     );
     await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('設定タブ'));
 
     await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
 
@@ -135,6 +163,8 @@ describe('<AppContent />', () => {
     );
     await emit(session);
 
+    await fireEvent.press(screen.getByLabelText('設定タブ'));
+
     await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
 
     expect(authService.signOut).toHaveBeenCalledTimes(1);
@@ -143,7 +173,7 @@ describe('<AppContent />', () => {
         '通信に失敗しました。接続を確認して再度お試しください。',
       ),
     ).toBeTruthy();
-    expect(screen.getByText('思い出を探しに行こう')).toBeTruthy();
+    expect(screen.getByLabelText('設定画面')).toBeTruthy();
   });
 
   test('認証監視を重複登録せず、アプリのアンマウント時に解除する', async () => {
