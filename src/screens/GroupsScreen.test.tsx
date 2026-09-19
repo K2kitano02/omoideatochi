@@ -27,6 +27,7 @@ const createGroupService = (
     ok: true,
     groupId: '33333333-3333-3333-3333-333333333333',
   }),
+  getGroupDetails: jest.fn(),
   listGroups: jest.fn().mockResolvedValue({ ok: true, groups: [] }),
   ...overrides,
 });
