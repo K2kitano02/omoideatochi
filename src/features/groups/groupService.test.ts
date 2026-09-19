@@ -9,11 +9,31 @@ type ClientError = {
 
 const createClient = () => {
   const order = jest.fn();
-  const select = jest.fn(() => ({ order }));
+  const maybeSingle = jest.fn();
+  const eq = jest.fn(() => ({ maybeSingle }));
+  const select = jest.fn(() => ({ eq, order }));
   const from = jest.fn(() => ({ select }));
   const rpc = jest.fn();
+  const getSession = jest.fn().mockResolvedValue({
+    data: {
+      session: {
+        access_token: 'access-token-must-not-be-returned',
+        user: { id: '00000000-0000-0000-0000-000000000001' },
+      },
+    },
+    error: null,
+  });
 
-  return { client: { from, rpc }, from, order, rpc, select };
+  return {
+    client: { auth: { getSession }, from, rpc },
+    eq,
+    from,
+    getSession,
+    maybeSingle,
+    order,
+    rpc,
+    select,
+  };
 };
 
 const databaseError = (overrides: Partial<ClientError> = {}): ClientError => ({
@@ -83,6 +103,205 @@ describe('createGroupService', () => {
     const result = await service.listGroups();
 
     expect(result).toEqual({ ok: true, groups: [] });
+  });
+
+  test('グループ詳細と現在のメンバーをアプリ用の形式へ変換する', async () => {
+    const { client, eq, from, maybeSingle, select } = createClient();
+    maybeSingle.mockResolvedValue({
+      data: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        created_by: '00000000-0000-0000-0000-000000000001',
+        created_at: '2026-09-19T00:00:00.000Z',
+        group_members: [
+          {
+            user_id: '00000000-0000-0000-0000-000000000001',
+            joined_at: '2026-09-19T00:00:00.000Z',
+          },
+          {
+            user_id: '00000000-0000-0000-0000-000000000002',
+            joined_at: '2026-09-20T00:00:00.000Z',
+          },
+        ],
+      },
+      error: null,
+    });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(from).toHaveBeenCalledWith('groups');
+    expect(select).toHaveBeenCalledWith(
+      'id, name, created_by, created_at, group_members(user_id, joined_at)',
+    );
+    expect(eq).toHaveBeenCalledWith(
+      'id',
+      '40000000-0000-0000-0000-000000000001',
+    );
+    expect(result).toEqual({
+      ok: true,
+      group: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        createdBy: '00000000-0000-0000-0000-000000000001',
+        createdAt: '2026-09-19T00:00:00.000Z',
+        members: [
+          {
+            userId: '00000000-0000-0000-0000-000000000001',
+            role: 'owner',
+            joinedAt: '2026-09-19T00:00:00.000Z',
+          },
+          {
+            userId: '00000000-0000-0000-0000-000000000002',
+            role: 'member',
+            joinedAt: '2026-09-20T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(
+      'access-token-must-not-be-returned',
+    );
+  });
+
+  test('未ログインではグループ詳細を問い合わせない', async () => {
+    const { client, from, getSession } = createClient();
+    getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'unauthenticated',
+        message: 'ログインが必要です。再度ログインしてください。',
+      },
+    });
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  test('RLSで見えないグループは安全な権限エラーを返す', async () => {
+    const { client, maybeSingle } = createClient();
+    maybeSingle.mockResolvedValue({ data: null, error: null });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000099',
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'permission-denied',
+        message: 'このグループの情報を表示する権限がありません。',
+      },
+    });
+  });
+
+  test('メンバーがいない応答は正常な空配列として扱う', async () => {
+    const { client, maybeSingle } = createClient();
+    maybeSingle.mockResolvedValue({
+      data: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        created_by: '00000000-0000-0000-0000-000000000001',
+        created_at: '2026-09-19T00:00:00.000Z',
+        group_members: [],
+      },
+      error: null,
+    });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      group: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        createdBy: '00000000-0000-0000-0000-000000000001',
+        createdAt: '2026-09-19T00:00:00.000Z',
+        members: [],
+      },
+    });
+  });
+
+  test('グループ詳細取得の通信例外をnetworkとして返す', async () => {
+    const { client, maybeSingle } = createClient();
+    maybeSingle.mockRejectedValue(new TypeError('Network request failed'));
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'network',
+        message: '通信に失敗しました。接続を確認して再度お試しください。',
+      },
+    });
+  });
+
+  test('グループ詳細の不正なメンバー形式を安全なエラーへ変換する', async () => {
+    const { client, maybeSingle } = createClient();
+    maybeSingle.mockResolvedValue({
+      data: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        created_by: '00000000-0000-0000-0000-000000000001',
+        created_at: '2026-09-19T00:00:00.000Z',
+        group_members: [{ user_id: null, joined_at: 'invalid-member-secret' }],
+      },
+      error: null,
+    });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'unexpected',
+        message:
+          'グループ情報の処理に失敗しました。時間をおいて再度お試しください。',
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('invalid-member-secret');
+  });
+
+  test('グループ詳細のDBエラーから内部情報を除いて返す', async () => {
+    const { client, maybeSingle } = createClient();
+    maybeSingle.mockResolvedValue({ data: null, error: databaseError() });
+    const service = createGroupService(client as never);
+
+    const result = await service.getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'unexpected',
+        message:
+          'グループ情報の処理に失敗しました。時間をおいて再度お試しください。',
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('secret');
+    expect(JSON.stringify(result)).not.toContain('select *');
   });
 
   test.each([
