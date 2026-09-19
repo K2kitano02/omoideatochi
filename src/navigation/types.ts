@@ -4,3 +4,8 @@ export type AuthenticatedTabParamList = {
   Collection: undefined;
   Settings: undefined;
 };
+
+export type GroupsStackParamList = {
+  GroupsList: undefined;
+  GroupDetails: { groupId: string };
+};

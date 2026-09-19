@@ -41,15 +41,45 @@ describe('<GroupsScreen />', () => {
       }),
     });
 
-    await render(<GroupsScreen groupService={groupService} />);
+    await render(
+      <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+    );
 
     expect(await screen.findByText('家族')).toBeTruthy();
     expect(screen.getByText('学生時代の友達')).toBeTruthy();
     expect(screen.getByText('2 / 5')).toBeTruthy();
   });
 
+  test('グループを選ぶと対象IDで詳細表示を依頼する', async () => {
+    const onSelectGroup = jest.fn();
+    const groupService = createGroupService({
+      listGroups: jest.fn().mockResolvedValue({
+        ok: true,
+        groups: [familyGroup],
+      }),
+    });
+
+    await render(
+      <GroupsScreen
+        groupService={groupService}
+        onSelectGroup={onSelectGroup}
+      />,
+    );
+
+    await fireEvent.press(
+      await screen.findByRole('button', { name: '家族の詳細を開く' }),
+    );
+
+    expect(onSelectGroup).toHaveBeenCalledWith(familyGroup.id);
+  });
+
   test('所属グループがない場合は空状態と作成導線を表示する', async () => {
-    await render(<GroupsScreen groupService={createGroupService()} />);
+    await render(
+      <GroupsScreen
+        groupService={createGroupService()}
+        onSelectGroup={jest.fn()}
+      />,
+    );
 
     expect(await screen.findByText('まだグループはありません')).toBeTruthy();
     expect(
@@ -58,7 +88,12 @@ describe('<GroupsScreen />', () => {
   });
 
   test('グループ作成画面を前面中央に表示する', async () => {
-    await render(<GroupsScreen groupService={createGroupService()} />);
+    await render(
+      <GroupsScreen
+        groupService={createGroupService()}
+        onSelectGroup={jest.fn()}
+      />,
+    );
     await screen.findByText('まだグループはありません');
 
     await fireEvent.press(
@@ -100,7 +135,9 @@ describe('<GroupsScreen />', () => {
       });
       const groupService = createGroupService({ createGroup });
 
-      await render(<GroupsScreen groupService={groupService} />);
+      await render(
+        <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+      );
       await screen.findByText('まだグループはありません');
 
       await fireEvent.press(
@@ -125,7 +162,9 @@ describe('<GroupsScreen />', () => {
       .mockResolvedValueOnce({ ok: true, groups: [familyGroup] });
     const groupService = createGroupService({ listGroups });
 
-    await render(<GroupsScreen groupService={groupService} />);
+    await render(
+      <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+    );
     await screen.findByText('まだグループはありません');
 
     await fireEvent.press(
@@ -151,7 +190,9 @@ describe('<GroupsScreen />', () => {
       }),
     });
 
-    await render(<GroupsScreen groupService={groupService} />);
+    await render(
+      <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+    );
     await screen.findByText('まだグループはありません');
 
     await fireEvent.press(
@@ -181,7 +222,9 @@ describe('<GroupsScreen />', () => {
       .mockResolvedValueOnce({ ok: true, groups: [familyGroup] });
     const groupService = createGroupService({ listGroups });
 
-    await render(<GroupsScreen groupService={groupService} />);
+    await render(
+      <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+    );
 
     expect(
       await screen.findByText(
@@ -208,7 +251,9 @@ describe('<GroupsScreen />', () => {
     );
     const groupService = createGroupService({ createGroup });
 
-    await render(<GroupsScreen groupService={groupService} />);
+    await render(
+      <GroupsScreen groupService={groupService} onSelectGroup={jest.fn()} />,
+    );
     await screen.findByText('まだグループはありません');
 
     await fireEvent.press(

@@ -20,6 +20,7 @@ import type { Group, GroupService } from '../features/groups/groupService';
 
 type GroupsScreenProps = {
   groupService?: GroupService;
+  onSelectGroup: (groupId: string) => void;
 };
 
 const validateGroupName = (name: string): string | undefined => {
@@ -38,7 +39,10 @@ const validateGroupName = (name: string): string | undefined => {
   return undefined;
 };
 
-export const GroupsScreen = ({ groupService }: GroupsScreenProps) => {
+export const GroupsScreen = ({
+  groupService,
+  onSelectGroup,
+}: GroupsScreenProps) => {
   const service = useMemo(
     () => groupService ?? getGroupService(),
     [groupService],
@@ -251,16 +255,22 @@ export const GroupsScreen = ({ groupService }: GroupsScreenProps) => {
         ) : (
           <View style={styles.groupList}>
             {groups.map((group) => (
-              <View
-                accessibilityLabel={`グループ ${group.name}`}
+              <Pressable
+                accessibilityLabel={`${group.name}の詳細を開く`}
+                accessibilityRole="button"
                 key={group.id}
-                style={styles.groupCard}
+                onPress={() => onSelectGroup(group.id)}
+                style={({ pressed }) => [
+                  styles.groupCard,
+                  pressed && styles.groupCardPressed,
+                ]}
               >
                 <View style={styles.groupMark}>
                   <View style={styles.groupMarkCore} />
                 </View>
                 <Text style={styles.groupName}>{group.name}</Text>
-              </View>
+                <Ionicons color="#6F818B" name="chevron-forward" size={20} />
+              </Pressable>
             ))}
             <CreateButton label={createButtonLabel} onPress={openCreateModal} />
           </View>
@@ -564,6 +574,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     marginLeft: 14,
+  },
+  groupCardPressed: {
+    backgroundColor: '#E7EEF1',
+    transform: [{ scale: 0.99 }],
   },
   createButton: {
     alignItems: 'center',
