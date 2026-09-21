@@ -164,6 +164,27 @@ describe('createGroupInvitationService', () => {
     });
   });
 
+  test('所有グループごとの承認待ち件数を画面用の形式へ変換する', async () => {
+    const { client, rpc } = createClient();
+    rpc.mockResolvedValue({
+      data: [
+        {
+          group_id: GROUP_ID,
+          pending_count: 2,
+        },
+      ],
+      error: null,
+    });
+    const service = createGroupInvitationService(client as never);
+
+    const result = await service.listOwnedGroupPendingCounts();
+
+    expect(result).toEqual({
+      ok: true,
+      counts: [{ groupId: GROUP_ID, pendingCount: 2 }],
+    });
+  });
+
   test('自分の参加申請履歴を状態付きで変換する', async () => {
     const { client, rpc } = createClient();
     rpc.mockResolvedValue({

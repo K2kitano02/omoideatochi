@@ -5,6 +5,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { AppContent } from '../App';
 import type { AuthStateClient } from '../src/features/auth/useAuthSession';
 
+const mockListOwnedGroupPendingCounts = jest.fn();
+
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
 jest.mock('../src/features/groups/groups', () => ({
   getGroupService: () => ({
@@ -39,6 +41,25 @@ jest.mock('../src/features/groups/groups', () => ({
         },
       ],
     }),
+  }),
+}));
+jest.mock('../src/features/groups/groupInvitations', () => ({
+  getGroupInvitationService: () => ({
+    cancelJoinRequest: jest.fn().mockResolvedValue({ ok: true }),
+    createInvitation: jest.fn().mockResolvedValue({
+      ok: true,
+      invitation: {
+        token: 'a'.repeat(64),
+        expiresAt: '2026-09-21T12:10:00.000Z',
+        requiresApproval: true,
+      },
+    }),
+    listJoinRequests: jest.fn().mockResolvedValue({ ok: true, requests: [] }),
+    listMyJoinRequests: jest.fn().mockResolvedValue({ ok: true, requests: [] }),
+    listOwnedGroupPendingCounts: mockListOwnedGroupPendingCounts,
+    previewInvitation: jest.fn(),
+    redeemInvitation: jest.fn(),
+    resolveJoinRequest: jest.fn(),
   }),
 }));
 
@@ -96,6 +117,13 @@ const createAuthClient = () => {
 };
 
 describe('<AppContent />', () => {
+  beforeEach(() => {
+    mockListOwnedGroupPendingCounts.mockReset().mockResolvedValue({
+      ok: true,
+      counts: [],
+    });
+  });
+
   test('初期セッションの確認中は認証画面を表示しない', async () => {
     const { authClient } = createAuthClient();
 
@@ -141,6 +169,29 @@ describe('<AppContent />', () => {
     expect(screen.getByLabelText('地図画面')).toBeTruthy();
   });
 
+  test('承認待ち件数をグループタブと対象グループへ表示する', async () => {
+    mockListOwnedGroupPendingCounts.mockResolvedValue({
+      ok: true,
+      counts: [
+        {
+          groupId: '40000000-0000-0000-0000-000000000001',
+          pendingCount: 3,
+        },
+      ],
+    });
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+
+    await emit(session);
+
+    expect(
+      await screen.findByLabelText('グループタブ、承認待ち3件'),
+    ).toBeTruthy();
+    expect(screen.getByText('3')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('グループタブ、承認待ち3件'));
+    expect(await screen.findByText('承認待ち 3件')).toBeTruthy();
+  });
+
   test('グループ一覧から詳細へ移動し、一覧へ戻れる', async () => {
     const { authClient, emit } = createAuthClient();
     await render(<AppContent authClient={authClient} />);
@@ -159,6 +210,40 @@ describe('<AppContent />', () => {
     );
 
     expect(await screen.findByLabelText('グループ画面')).toBeTruthy();
+  });
+
+  test('グループ一覧から招待コード参加画面へ移動して戻れる', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('グループタブ'));
+    await fireEvent.press(
+      screen.getByRole('button', { name: '招待コードで参加' }),
+    );
+
+    expect(await screen.findByLabelText('招待コード参加画面')).toBeTruthy();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'グループ一覧に戻る' }),
+    );
+    expect(await screen.findByLabelText('グループ画面')).toBeTruthy();
+  });
+
+  test('グループ詳細から招待管理画面へ移動する', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+
+    await fireEvent.press(screen.getByLabelText('グループタブ'));
+    await fireEvent.press(
+      await screen.findByRole('button', { name: '家族の詳細を開く' }),
+    );
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'メンバーを招待' }),
+    );
+
+    expect(await screen.findByLabelText('招待管理画面')).toBeTruthy();
+    expect(screen.getByText('10分間だけ使える招待コード')).toBeTruthy();
   });
 
   test('設定画面でログイン中のアカウントを確認できる', async () => {

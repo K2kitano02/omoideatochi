@@ -45,6 +45,11 @@ export type GroupJoinRequest = {
   createdAt: string;
 };
 
+export type OwnedGroupPendingCount = {
+  groupId: string;
+  pendingCount: number;
+};
+
 export type GroupJoinRequestStatus =
   'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -71,6 +76,10 @@ export type RedeemInvitationResult =
 
 export type ListJoinRequestsResult =
   | { ok: true; requests: GroupJoinRequest[] }
+  | { ok: false; error: GroupInvitationFailure };
+
+export type ListOwnedGroupPendingCountsResult =
+  | { ok: true; counts: OwnedGroupPendingCount[] }
   | { ok: false; error: GroupInvitationFailure };
 
 export type ListMyJoinRequestsResult =
@@ -260,6 +269,15 @@ const isGroupJoinRequestStatus = (
   value === 'approved' ||
   value === 'rejected' ||
   value === 'cancelled';
+
+const isOwnedGroupPendingCountRow = (
+  value: unknown,
+): value is { group_id: string; pending_count: number } =>
+  isRecord(value) &&
+  typeof value.group_id === 'string' &&
+  typeof value.pending_count === 'number' &&
+  Number.isSafeInteger(value.pending_count) &&
+  value.pending_count > 0;
 
 const isMyGroupJoinRequestRow = (
   value: unknown,
@@ -452,6 +470,35 @@ export const createGroupInvitationService = (client: SupabaseClient) => {
         })),
       };
     },
+
+    listOwnedGroupPendingCounts:
+      async (): Promise<ListOwnedGroupPendingCountsResult> => {
+        const response = await callSafely(() =>
+          client.rpc('get_owned_group_pending_counts'),
+        );
+
+        if (!response.ok) {
+          return response;
+        }
+
+        const { data, error } = response.value;
+
+        if (error) {
+          return { ok: false, error: toGroupInvitationFailure(error) };
+        }
+
+        if (!Array.isArray(data) || !data.every(isOwnedGroupPendingCountRow)) {
+          return { ok: false, error: unexpectedFailure() };
+        }
+
+        return {
+          ok: true,
+          counts: data.map((count) => ({
+            groupId: count.group_id,
+            pendingCount: count.pending_count,
+          })),
+        };
+      },
 
     listMyJoinRequests: async (): Promise<ListMyJoinRequestsResult> => {
       const response = await callSafely(() =>

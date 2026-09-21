@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 
 import type { AuthSessionUser } from '../features/auth/useAuthSession';
+import { useOwnedGroupPendingCounts } from '../features/groups/useOwnedGroupPendingCounts';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -48,52 +49,81 @@ export const AuthenticatedNavigator = ({
   error,
   isSigningOut,
   onSignOut,
-}: AuthenticatedNavigatorProps) => (
-  <NavigationContainer theme={navigationTheme}>
-    <Tab.Navigator
-      initialRouteName="Map"
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarAccessibilityLabel: `${getTabLabel(route.name)}タブ`,
-        tabBarActiveTintColor: '#E7A84B',
-        tabBarInactiveTintColor: '#91A7B4',
-        tabBarIcon: ({ color, focused, size }) => (
-          <Ionicons
-            color={color}
-            name={
-              focused
-                ? tabIcons[route.name].focused
-                : tabIcons[route.name].unfocused
-            }
-            size={size}
-          />
-        ),
-        tabBarLabel: getTabLabel(route.name),
-        tabBarStyle: {
-          backgroundColor: '#102F42',
-          borderTopColor: '#244354',
-          height: 82,
-          paddingBottom: 12,
-          paddingTop: 8,
-        },
-      })}
-    >
-      <Tab.Screen component={MapScreen} name="Map" />
-      <Tab.Screen component={GroupsNavigator} name="Groups" />
-      <Tab.Screen component={CollectionScreen} name="Collection" />
-      <Tab.Screen name="Settings">
-        {() => (
-          <SettingsScreen
-            error={error}
-            isSigningOut={isSigningOut}
-            onSignOut={onSignOut}
-            user={user}
-          />
-        )}
-      </Tab.Screen>
-    </Tab.Navigator>
-  </NavigationContainer>
-);
+}: AuthenticatedNavigatorProps) => {
+  const { countsByGroup, refresh, totalCount } = useOwnedGroupPendingCounts();
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <Tab.Navigator
+        initialRouteName="Map"
+        screenOptions={({ route }) => {
+          const pendingLabel =
+            route.name === 'Groups' && totalCount > 0
+              ? `、承認待ち${totalCount}件`
+              : '';
+
+          return {
+            headerShown: false,
+            tabBarAccessibilityLabel: `${getTabLabel(route.name)}タブ${pendingLabel}`,
+            tabBarActiveTintColor: '#E7A84B',
+            tabBarBadge:
+              route.name === 'Groups' && totalCount > 0
+                ? totalCount
+                : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: '#D68B21',
+              color: '#FFFFFF',
+              fontSize: 10,
+              fontWeight: '800',
+            },
+            tabBarInactiveTintColor: '#91A7B4',
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons
+                color={color}
+                name={
+                  focused
+                    ? tabIcons[route.name].focused
+                    : tabIcons[route.name].unfocused
+                }
+                size={size}
+              />
+            ),
+            tabBarLabel: getTabLabel(route.name),
+            tabBarStyle: {
+              backgroundColor: '#102F42',
+              borderTopColor: '#244354',
+              height: 82,
+              paddingBottom: 12,
+              paddingTop: 8,
+            },
+          };
+        }}
+      >
+        <Tab.Screen component={MapScreen} name="Map" />
+        <Tab.Screen name="Groups">
+          {() => (
+            <GroupsNavigator
+              currentUserId={user.id}
+              onRefreshPendingCounts={refresh}
+              pendingCounts={countsByGroup}
+            />
+          )}
+        </Tab.Screen>
+        <Tab.Screen component={CollectionScreen} name="Collection" />
+        <Tab.Screen name="Settings">
+          {() => (
+            <SettingsScreen
+              error={error}
+              isSigningOut={isSigningOut}
+              onSignOut={onSignOut}
+              user={user}
+            />
+          )}
+        </Tab.Screen>
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+};
 
 const getTabLabel = (routeName: keyof AuthenticatedTabParamList) => {
   const labels: Record<keyof AuthenticatedTabParamList, string> = {

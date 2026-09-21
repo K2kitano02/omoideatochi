@@ -31,6 +31,53 @@ const createGroupService = (
 ): Pick<GroupService, 'getGroupDetails'> => ({ getGroupDetails });
 
 describe('<GroupDetailScreen />', () => {
+  test('招待管理画面へグループ情報とオーナー判定を渡す', async () => {
+    const onInvite = jest.fn();
+    const groupService = createGroupService(
+      jest.fn().mockResolvedValue({ ok: true, group: groupDetails }),
+    );
+
+    await render(
+      <GroupDetailScreen
+        currentUserId="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001"
+        groupId={groupId}
+        groupService={groupService}
+        onBack={jest.fn()}
+        onInvite={onInvite}
+      />,
+    );
+
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'メンバーを招待' }),
+    );
+
+    expect(onInvite).toHaveBeenCalledWith({
+      groupId,
+      groupName: '家族',
+      isOwner: true,
+    });
+  });
+
+  test('招待導線に承認待ち件数を表示する', async () => {
+    const groupService = createGroupService(
+      jest.fn().mockResolvedValue({ ok: true, group: groupDetails }),
+    );
+
+    await render(
+      <GroupDetailScreen
+        groupId={groupId}
+        groupService={groupService}
+        onBack={jest.fn()}
+        pendingCount={2}
+      />,
+    );
+
+    expect(await screen.findByText('承認待ち 2件')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'メンバーを招待、承認待ち2件' }),
+    ).toBeTruthy();
+  });
+
   test('グループ名と作成者・通常メンバーを区別して表示する', async () => {
     const groupService = createGroupService(
       jest.fn().mockResolvedValue({

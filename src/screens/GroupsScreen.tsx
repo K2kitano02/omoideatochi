@@ -20,7 +20,9 @@ import type { Group, GroupService } from '../features/groups/groupService';
 
 type GroupsScreenProps = {
   groupService?: GroupService;
+  onJoinByCode?: () => void;
   onSelectGroup: (groupId: string) => void;
+  pendingCounts?: Readonly<Record<string, number>>;
 };
 
 const validateGroupName = (name: string): string | undefined => {
@@ -41,7 +43,9 @@ const validateGroupName = (name: string): string | undefined => {
 
 export const GroupsScreen = ({
   groupService,
+  onJoinByCode,
   onSelectGroup,
+  pendingCounts = {},
 }: GroupsScreenProps) => {
   const service = useMemo(
     () => groupService ?? getGroupService(),
@@ -196,6 +200,20 @@ export const GroupsScreen = ({
           大切な人と共有する思い出を、グループごとに振り返れます。
         </Text>
 
+        <Pressable
+          accessibilityLabel="招待コードで参加"
+          accessibilityRole="button"
+          onPress={onJoinByCode}
+          style={({ pressed }) => [
+            styles.joinButton,
+            pressed && styles.joinButtonPressed,
+          ]}
+        >
+          <Ionicons color="#F1C47D" name="key-outline" size={19} />
+          <Text style={styles.joinButtonText}>招待コードで参加</Text>
+          <Ionicons color="#91A7B4" name="chevron-forward" size={18} />
+        </Pressable>
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>所属グループ</Text>
           <View
@@ -254,24 +272,37 @@ export const GroupsScreen = ({
           </View>
         ) : (
           <View style={styles.groupList}>
-            {groups.map((group) => (
-              <Pressable
-                accessibilityLabel={`${group.name}の詳細を開く`}
-                accessibilityRole="button"
-                key={group.id}
-                onPress={() => onSelectGroup(group.id)}
-                style={({ pressed }) => [
-                  styles.groupCard,
-                  pressed && styles.groupCardPressed,
-                ]}
-              >
-                <View style={styles.groupMark}>
-                  <View style={styles.groupMarkCore} />
-                </View>
-                <Text style={styles.groupName}>{group.name}</Text>
-                <Ionicons color="#6F818B" name="chevron-forward" size={20} />
-              </Pressable>
-            ))}
+            {groups.map((group) => {
+              const pendingCount = pendingCounts[group.id] ?? 0;
+
+              return (
+                <Pressable
+                  accessibilityLabel={`${group.name}の詳細を開く${
+                    pendingCount > 0 ? `、承認待ち${pendingCount}件` : ''
+                  }`}
+                  accessibilityRole="button"
+                  key={group.id}
+                  onPress={() => onSelectGroup(group.id)}
+                  style={({ pressed }) => [
+                    styles.groupCard,
+                    pressed && styles.groupCardPressed,
+                  ]}
+                >
+                  <View style={styles.groupMark}>
+                    <View style={styles.groupMarkCore} />
+                  </View>
+                  <Text style={styles.groupName}>{group.name}</Text>
+                  {pendingCount > 0 ? (
+                    <View style={styles.pendingBadge}>
+                      <Text style={styles.pendingBadgeText}>
+                        承認待ち {pendingCount}件
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Ionicons color="#6F818B" name="chevron-forward" size={20} />
+                </Pressable>
+              );
+            })}
             <CreateButton label={createButtonLabel} onPress={openCreateModal} />
           </View>
         )}
@@ -432,11 +463,30 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 10,
   },
+  joinButton: {
+    alignItems: 'center',
+    backgroundColor: '#183B4E',
+    borderColor: '#315365',
+    borderRadius: 15,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+    minHeight: 54,
+    paddingHorizontal: 16,
+  },
+  joinButtonPressed: { backgroundColor: '#21485C' },
+  joinButtonText: {
+    color: '#F6F9FA',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 30,
+    marginTop: 26,
   },
   sectionTitle: {
     color: '#F6F9FA',
@@ -553,6 +603,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
+  pendingBadge: {
+    backgroundColor: '#FFF0D8',
+    borderRadius: 10,
+    marginRight: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  pendingBadgeText: { color: '#9B5D10', fontSize: 10, fontWeight: '800' },
   groupMark: {
     alignItems: 'center',
     borderColor: '#E7A84B',

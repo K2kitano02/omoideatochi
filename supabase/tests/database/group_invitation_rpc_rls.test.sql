@@ -1460,5 +1460,139 @@ select throws_ok(
 );
 reset role;
 
+select has_function(
+  'public',
+  'get_owned_group_pending_counts',
+  array[]::text[],
+  'owned group pending count RPC exists'
+);
+select ok(
+  coalesce(
+    has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.get_owned_group_pending_counts()'),
+      'EXECUTE'
+    ),
+    false
+  ),
+  'authenticated users can read their owned group pending counts'
+);
+select ok(
+  not coalesce(
+    has_function_privilege(
+      'anon',
+      to_regprocedure('public.get_owned_group_pending_counts()'),
+      'EXECUTE'
+    ),
+    false
+  ),
+  'anonymous users cannot read owned group pending counts'
+);
+
+insert into auth.users (id, email)
+values
+  ('00000000-0000-0000-0000-000000000620', 'pending-count-owner@example.test'),
+  ('00000000-0000-0000-0000-000000000621', 'pending-count-member@example.test'),
+  ('00000000-0000-0000-0000-000000000622', 'pending-count-applicant-1@example.test'),
+  ('00000000-0000-0000-0000-000000000623', 'pending-count-applicant-2@example.test'),
+  ('00000000-0000-0000-0000-000000000624', 'pending-count-other-owner@example.test'),
+  ('00000000-0000-0000-0000-000000000625', 'pending-count-other-applicant@example.test');
+
+insert into public.groups (id, name, created_by)
+values
+  (
+    '60000000-0000-0000-0000-000000000604',
+    'Pending count first group',
+    '00000000-0000-0000-0000-000000000620'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000605',
+    'Pending count second group',
+    '00000000-0000-0000-0000-000000000620'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000606',
+    'Pending count other group',
+    '00000000-0000-0000-0000-000000000624'
+  );
+
+insert into public.group_members (group_id, user_id)
+values
+  ('60000000-0000-0000-0000-000000000604', '00000000-0000-0000-0000-000000000620'),
+  ('60000000-0000-0000-0000-000000000604', '00000000-0000-0000-0000-000000000621'),
+  ('60000000-0000-0000-0000-000000000605', '00000000-0000-0000-0000-000000000620'),
+  ('60000000-0000-0000-0000-000000000606', '00000000-0000-0000-0000-000000000624');
+
+insert into public.group_join_requests (group_id, applicant_id)
+values
+  ('60000000-0000-0000-0000-000000000604', '00000000-0000-0000-0000-000000000622'),
+  ('60000000-0000-0000-0000-000000000604', '00000000-0000-0000-0000-000000000623'),
+  ('60000000-0000-0000-0000-000000000605', '00000000-0000-0000-0000-000000000622'),
+  ('60000000-0000-0000-0000-000000000606', '00000000-0000-0000-0000-000000000625');
+
+insert into public.group_join_requests (
+  group_id,
+  applicant_id,
+  status,
+  resolved_at,
+  resolved_by
+) values (
+  '60000000-0000-0000-0000-000000000604',
+  '00000000-0000-0000-0000-000000000625',
+  'rejected',
+  now(),
+  '00000000-0000-0000-0000-000000000620'
+);
+
+select set_config('request.jwt.claim.sub', '', true);
+set local role authenticated;
+select throws_ok(
+  $$select * from public.get_owned_group_pending_counts()$$,
+  '28000',
+  'authentication_required',
+  'a missing user ID cannot read owned group pending counts'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000620', true);
+set local role authenticated;
+select results_eq(
+  $$
+    select counts.group_id, counts.pending_count
+    from public.get_owned_group_pending_counts() as counts
+    order by counts.group_id
+  $$,
+  $$
+    values
+      ('60000000-0000-0000-0000-000000000604'::uuid, 2::bigint),
+      ('60000000-0000-0000-0000-000000000605'::uuid, 1::bigint)
+  $$,
+  'an owner receives pending counts for each owned group only'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000621', true);
+set local role authenticated;
+select is(
+  (select count(*)::integer from public.get_owned_group_pending_counts()),
+  0,
+  'a normal member cannot see the owner pending counts'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000624', true);
+set local role authenticated;
+select results_eq(
+  $$
+    select counts.group_id, counts.pending_count
+    from public.get_owned_group_pending_counts() as counts
+  $$,
+  $$
+    values ('60000000-0000-0000-0000-000000000606'::uuid, 1::bigint)
+  $$,
+  'an owner cannot see another owner pending counts'
+);
+reset role;
+
 select * from finish();
 rollback;

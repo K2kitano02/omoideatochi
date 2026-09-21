@@ -10,6 +10,7 @@
     "@supabase/supabase-js": "^2.115.0",
     "expo": "~57.0.18",
     "expo-asset": "~57.0.16",
+    "expo-clipboard": "~57.0.2",
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
