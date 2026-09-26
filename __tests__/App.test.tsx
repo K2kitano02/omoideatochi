@@ -6,8 +6,16 @@ import { AppContent } from '../App';
 import type { AuthStateClient } from '../src/features/auth/useAuthSession';
 
 const mockListOwnedGroupPendingCounts = jest.fn();
+const mockGetMyProfile = jest.fn();
+const mockSaveDisplayName = jest.fn();
 
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
+jest.mock('../src/features/profile/profiles', () => ({
+  getProfileService: () => ({
+    getMyProfile: mockGetMyProfile,
+    saveDisplayName: mockSaveDisplayName,
+  }),
+}));
 jest.mock('../src/features/groups/groups', () => ({
   getGroupService: () => ({
     createGroup: jest.fn().mockResolvedValue({
@@ -122,6 +130,80 @@ describe('<AppContent />', () => {
       ok: true,
       counts: [],
     });
+    mockGetMyProfile.mockReset().mockResolvedValue({
+      ok: true,
+      profile: {
+        userId: '11111111-1111-1111-1111-111111111111',
+        displayName: 'なおき',
+      },
+    });
+    mockSaveDisplayName.mockReset().mockResolvedValue({
+      ok: true,
+      profile: {
+        userId: '11111111-1111-1111-1111-111111111111',
+        displayName: 'なおき',
+      },
+    });
+  });
+
+  test('既存ユーザーにプロフィールがなければ表示名設定を完了するまで地図を表示しない', async () => {
+    mockGetMyProfile.mockResolvedValue({ ok: true, profile: null });
+    mockSaveDisplayName.mockResolvedValue({
+      ok: true,
+      profile: {
+        userId: '11111111-1111-1111-1111-111111111111',
+        displayName: 'なおき',
+      },
+    });
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+
+    await emit(session);
+
+    expect(await screen.findByLabelText('表示名初期設定画面')).toBeTruthy();
+    expect(screen.queryByLabelText('地図画面')).toBeNull();
+
+    await fireEvent.changeText(screen.getByLabelText('表示名'), 'なおき');
+    await fireEvent.press(
+      screen.getByRole('button', { name: '表示名を設定する' }),
+    );
+
+    expect(await screen.findByLabelText('地図画面')).toBeTruthy();
+  });
+
+  test('プロフィール取得エラー画面からログアウトでき失敗理由も確認できる', async () => {
+    mockGetMyProfile.mockResolvedValue({
+      ok: false,
+      error: {
+        type: 'network',
+        message: 'プロフィールを取得できませんでした。',
+      },
+    });
+    const authService = {
+      signOut: jest.fn().mockResolvedValue({
+        ok: false,
+        error: {
+          type: 'network' as const,
+          message: 'ログアウトできませんでした。',
+        },
+      }),
+    };
+    const { authClient, emit } = createAuthClient();
+    await render(
+      <AppContent authClient={authClient} authService={authService} />,
+    );
+
+    await emit(session);
+
+    expect(
+      await screen.findByLabelText('プロフィール読み込みエラー'),
+    ).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
+
+    expect(authService.signOut).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText('ログアウトできませんでした。'),
+    ).toBeTruthy();
   });
 
   test('初期セッションの確認中は認証画面を表示しない', async () => {

@@ -18,7 +18,7 @@ const createAuthClient = () => ({
 });
 
 describe('createAuthService', () => {
-  test('メールアドレスとパスワードでサインアップし、安全なユーザー情報だけを返す', async () => {
+  test('表示名をユーザーメタデータへ含めてサインアップし、安全なユーザー情報だけを返す', async () => {
     const auth = createAuthClient();
     auth.signUp.mockResolvedValue({
       data: {
@@ -35,11 +35,13 @@ describe('createAuthService', () => {
     const result = await service.signUp({
       email: 'user@example.com',
       password: 'password-must-not-be-returned',
+      displayName: 'なおき',
     });
 
     expect(auth.signUp).toHaveBeenCalledWith({
       email: 'user@example.com',
       password: 'password-must-not-be-returned',
+      options: { data: { display_name: 'なおき' } },
     });
     expect(result).toEqual({ ok: true, user });
     expect(JSON.stringify(result)).not.toContain(
@@ -138,6 +140,7 @@ describe('createAuthService', () => {
     const result = await service.signUp({
       email: 'user@example.com',
       password: 'password',
+      displayName: 'なおき',
     });
 
     expect(result).toEqual({
@@ -184,6 +187,7 @@ describe('createAuthService', () => {
     const result = await service.signUp({
       email: 'user@example.com',
       password: 'secret',
+      displayName: 'なおき',
     });
 
     expect(result).toEqual({
@@ -207,6 +211,7 @@ describe('createAuthService', () => {
     const result = await service.signUp({
       email: 'user@example.com',
       password: 'password',
+      displayName: 'なおき',
     });
 
     expect(result).toEqual({

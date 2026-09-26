@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 
 import type { AuthSessionUser } from '../features/auth/useAuthSession';
+import type { SaveProfileResult } from '../features/profile/profileService';
 import { useOwnedGroupPendingCounts } from '../features/groups/useOwnedGroupPendingCounts';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { MapScreen } from '../screens/MapScreen';
@@ -13,8 +14,10 @@ import type { AuthenticatedTabParamList } from './types';
 type AuthenticatedNavigatorProps = {
   user: AuthSessionUser;
   error: string | null;
+  displayName: string;
   isSigningOut: boolean;
   onSignOut: () => Promise<void>;
+  onSaveDisplayName: (displayName: string) => Promise<SaveProfileResult>;
 };
 
 const Tab = createBottomTabNavigator<AuthenticatedTabParamList>();
@@ -46,9 +49,11 @@ const tabIcons: Record<
 
 export const AuthenticatedNavigator = ({
   user,
+  displayName,
   error,
   isSigningOut,
   onSignOut,
+  onSaveDisplayName,
 }: AuthenticatedNavigatorProps) => {
   const { countsByGroup, refresh, totalCount } = useOwnedGroupPendingCounts();
 
@@ -113,9 +118,11 @@ export const AuthenticatedNavigator = ({
         <Tab.Screen name="Settings">
           {() => (
             <SettingsScreen
+              displayName={displayName}
               error={error}
               isSigningOut={isSigningOut}
               onSignOut={onSignOut}
+              onSaveDisplayName={onSaveDisplayName}
               user={user}
             />
           )}

@@ -15,11 +15,13 @@ const groupDetails = {
   members: [
     {
       userId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001',
+      displayName: 'なおき',
       role: 'owner' as const,
       joinedAt: '2026-09-19T00:00:00.000Z',
     },
     {
       userId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0002',
+      displayName: 'あや',
       role: 'member' as const,
       joinedAt: '2026-09-20T00:00:00.000Z',
     },
@@ -96,14 +98,32 @@ describe('<GroupDetailScreen />', () => {
 
     expect(await screen.findByRole('header', { name: '家族' })).toBeTruthy();
     expect(screen.getByText('2人')).toBeTruthy();
-    expect(screen.getByText('aaaaaaaa…0001')).toBeTruthy();
-    expect(screen.getByText('bbbbbbbb…0002')).toBeTruthy();
-    expect(
-      screen.getByLabelText('作成者 aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001'),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText('メンバー bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0002'),
-    ).toBeTruthy();
+    expect(screen.getByText('なおき')).toBeTruthy();
+    expect(screen.getByText('あや')).toBeTruthy();
+    expect(screen.getByLabelText('作成者 なおき')).toBeTruthy();
+    expect(screen.getByLabelText('メンバー あや')).toBeTruthy();
+  });
+
+  test('表示名が取得できないメンバーだけ短縮UUIDを代替表示する', async () => {
+    const groupService = createGroupService(
+      jest.fn().mockResolvedValue({
+        ok: true,
+        group: {
+          ...groupDetails,
+          members: [{ ...groupDetails.members[1], displayName: null }],
+        },
+      }),
+    );
+
+    await render(
+      <GroupDetailScreen
+        groupId={groupId}
+        groupService={groupService}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('bbbbbbbb…0002')).toBeTruthy();
   });
 
   test('戻るボタンでグループ一覧へ戻るよう依頼する', async () => {

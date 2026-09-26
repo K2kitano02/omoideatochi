@@ -128,6 +128,7 @@ describe('<AuthScreen />', () => {
     await fireEvent.press(
       screen.getByRole('button', { name: 'アカウントを作成' }),
     );
+    await fireEvent.changeText(screen.getByLabelText('表示名'), 'なおき');
     await fireEvent.changeText(
       screen.getByLabelText('メールアドレス'),
       'new@example.com',
@@ -138,11 +139,38 @@ describe('<AuthScreen />', () => {
     expect(signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'secret1',
+      displayName: 'なおき',
     });
     expect(signIn).not.toHaveBeenCalled();
     expect(
       screen.getByText('登録を受け付けました。確認メールをご確認ください。'),
     ).toBeTruthy();
+  });
+
+  test.each([
+    ['', '表示名を入力してください'],
+    [' なおき', '表示名の前後に空白を入れないでください'],
+    ['1234567890123456', '表示名は15文字以内で入力してください'],
+  ])('不正な表示名「%s」では登録しない', async (displayName, error) => {
+    const signUp = jest.fn();
+    const authService = createAuthService({ signUp });
+
+    await render(<AuthScreen authService={authService} />);
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'アカウントを作成' }),
+    );
+    if (displayName) {
+      await fireEvent.changeText(screen.getByLabelText('表示名'), displayName);
+    }
+    await fireEvent.changeText(
+      screen.getByLabelText('メールアドレス'),
+      'new@example.com',
+    );
+    await fireEvent.changeText(screen.getByLabelText('パスワード'), 'secret1');
+    await fireEvent.press(screen.getByRole('button', { name: '登録する' }));
+
+    expect(signUp).not.toHaveBeenCalled();
+    expect(screen.getByText(error)).toBeTruthy();
   });
 
   test.each([
