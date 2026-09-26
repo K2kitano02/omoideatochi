@@ -63,9 +63,11 @@ select lives_ok(
   $$update public.groups set name = 'Member changed' where id = '40000000-0000-0000-0000-000000000401'$$,
   'member name update is ignored by RLS'
 );
-select lives_ok(
+select throws_ok(
   $$delete from public.groups where id = '40000000-0000-0000-0000-000000000401'$$,
-  'member group deletion is ignored by RLS'
+  '42501',
+  null,
+  'a member cannot directly delete a group'
 );
 reset role;
 select is((select name from public.groups where id = '40000000-0000-0000-0000-000000000401'), 'Family A updated', 'member did not change the group name');
@@ -79,9 +81,11 @@ select lives_ok(
   $$update public.groups set name = 'Outsider changed' where id = '40000000-0000-0000-0000-000000000401'$$,
   'outsider name update is ignored by RLS'
 );
-select lives_ok(
+select throws_ok(
   $$delete from public.groups where id = '40000000-0000-0000-0000-000000000401'$$,
-  'outsider group deletion is ignored by RLS'
+  '42501',
+  null,
+  'an outsider cannot directly delete a group'
 );
 reset role;
 select is((select name from public.groups where id = '40000000-0000-0000-0000-000000000401'), 'Family A updated', 'outsider did not change the group name');
@@ -91,13 +95,15 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000404
 set local role authenticated;
 select is((select count(*)::integer from public.groups where id = '40000000-0000-0000-0000-000000000404'), 1, 'second owner reads their group');
 select is((select count(*)::integer from public.groups where id = '40000000-0000-0000-0000-000000000401'), 0, 'second owner cannot read the first group');
-select lives_ok(
+select throws_ok(
   $$delete from public.groups where id = '40000000-0000-0000-0000-000000000404'$$,
-  'second owner can delete their group'
+  '42501',
+  null,
+  'an owner cannot bypass the dissolution RPC with a direct delete'
 );
 reset role;
-select is((select count(*)::integer from public.groups where id = '40000000-0000-0000-0000-000000000404'), 0, 'owner group deletion is saved');
-select is((select count(*)::integer from public.group_members where group_id = '40000000-0000-0000-0000-000000000404'), 0, 'deleted group memberships cascade');
+select is((select count(*)::integer from public.groups where id = '40000000-0000-0000-0000-000000000404'), 1, 'a blocked direct delete preserves the group');
+select is((select count(*)::integer from public.group_members where group_id = '40000000-0000-0000-0000-000000000404'), 1, 'a blocked direct delete preserves memberships');
 
 select set_config('request.jwt.claim.sub', '', true);
 set local role anon;

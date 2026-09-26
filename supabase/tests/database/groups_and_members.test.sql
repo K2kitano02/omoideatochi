@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(42);
+select plan(43);
 
 select has_table('public', 'groups', 'groups table exists');
 select has_table('public', 'group_members', 'group_members table exists');
@@ -11,7 +11,7 @@ select has_table('public', 'group_members', 'group_members table exists');
 select columns_are(
   'public',
   'groups',
-  array['id', 'name', 'created_by', 'created_at'],
+  array['id', 'name', 'created_by', 'created_at', 'dissolved_at'],
   'groups has the expected columns'
 );
 select columns_are(
@@ -30,6 +30,13 @@ select col_type_is(
   'created_at',
   'timestamp with time zone',
   'groups.created_at is timezone-aware'
+);
+select col_type_is(
+  'public',
+  'groups',
+  'dissolved_at',
+  'timestamp with time zone',
+  'groups.dissolved_at is timezone-aware'
 );
 select col_type_is('public', 'group_members', 'group_id', 'uuid', 'group_members.group_id is uuid');
 select col_type_is('public', 'group_members', 'user_id', 'uuid', 'group_members.user_id is uuid');
