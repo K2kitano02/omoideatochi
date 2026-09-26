@@ -33,6 +33,24 @@ const createGroupService = (
 });
 
 describe('<GroupsScreen />', () => {
+  test('招待コード参加画面を開くよう依頼する', async () => {
+    const onJoinByCode = jest.fn();
+
+    await render(
+      <GroupsScreen
+        groupService={createGroupService()}
+        onJoinByCode={onJoinByCode}
+        onSelectGroup={jest.fn()}
+      />,
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: '招待コードで参加' }),
+    );
+
+    expect(onJoinByCode).toHaveBeenCalledTimes(1);
+  });
+
   test('所属グループ名と作成数を表示する', async () => {
     const groupService = createGroupService({
       listGroups: jest.fn().mockResolvedValue({
@@ -48,6 +66,27 @@ describe('<GroupsScreen />', () => {
     expect(await screen.findByText('家族')).toBeTruthy();
     expect(screen.getByText('学生時代の友達')).toBeTruthy();
     expect(screen.getByText('2 / 5')).toBeTruthy();
+  });
+
+  test('承認待ちがあるグループだけ件数を表示する', async () => {
+    const groupService = createGroupService({
+      listGroups: jest.fn().mockResolvedValue({
+        ok: true,
+        groups: [familyGroup, friendsGroup],
+      }),
+    });
+
+    await render(
+      <GroupsScreen
+        groupService={groupService}
+        onSelectGroup={jest.fn()}
+        pendingCounts={{ [familyGroup.id]: 2 }}
+      />,
+    );
+
+    expect(await screen.findByText('承認待ち 2件')).toBeTruthy();
+    expect(screen.getByLabelText('家族の詳細を開く、承認待ち2件')).toBeTruthy();
+    expect(screen.getByLabelText('学生時代の友達の詳細を開く')).toBeTruthy();
   });
 
   test('グループを選ぶと対象IDで詳細表示を依頼する', async () => {

@@ -8,4 +8,10 @@ export type AuthenticatedTabParamList = {
 export type GroupsStackParamList = {
   GroupsList: undefined;
   GroupDetails: { groupId: string };
+  GroupInvitation: {
+    groupId: string;
+    groupName: string;
+    isOwner: boolean;
+  };
+  JoinGroup: undefined;
 };

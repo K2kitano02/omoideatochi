@@ -20,9 +20,16 @@ import type {
 } from '../features/groups/groupService';
 
 type GroupDetailScreenProps = {
+  currentUserId?: string;
   groupId: string;
   groupService?: Pick<GroupService, 'getGroupDetails'>;
   onBack: () => void;
+  onInvite?: (params: {
+    groupId: string;
+    groupName: string;
+    isOwner: boolean;
+  }) => void;
+  pendingCount?: number;
 };
 
 type GroupDetailSource = {
@@ -34,9 +41,12 @@ const shortenUserId = (userId: string) =>
   `${userId.slice(0, 8)}…${userId.slice(-4)}`;
 
 export const GroupDetailScreen = ({
+  currentUserId,
   groupId,
   groupService,
   onBack,
+  onInvite,
+  pendingCount = 0,
 }: GroupDetailScreenProps) => {
   const service = useMemo(
     () => groupService ?? getGroupService(),
@@ -171,6 +181,42 @@ export const GroupDetailScreen = ({
             </Text>
             <Text style={styles.subtitle}>このグループで共有する思い出</Text>
           </View>
+
+          <Pressable
+            accessibilityLabel={`メンバーを招待${
+              pendingCount > 0 ? `、承認待ち${pendingCount}件` : ''
+            }`}
+            accessibilityRole="button"
+            onPress={() =>
+              onInvite?.({
+                groupId: group.id,
+                groupName: group.name,
+                isOwner: group.createdBy === currentUserId,
+              })
+            }
+            style={({ pressed }) => [
+              styles.inviteButton,
+              pressed && styles.inviteButtonPressed,
+            ]}
+          >
+            <View style={styles.inviteIcon}>
+              <Ionicons color="#D68B21" name="person-add-outline" size={19} />
+            </View>
+            <View style={styles.inviteTextArea}>
+              <Text style={styles.inviteTitle}>メンバーを招待</Text>
+              <Text style={styles.inviteDescription}>
+                10分間有効なコードを発行
+              </Text>
+            </View>
+            {pendingCount > 0 ? (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>
+                  承認待ち {pendingCount}件
+                </Text>
+              </View>
+            ) : null}
+            <Ionicons color="#6F818B" name="chevron-forward" size={20} />
+          </Pressable>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>メンバー</Text>
@@ -364,6 +410,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
+  inviteButton: {
+    alignItems: 'center',
+    backgroundColor: '#F6F9FA',
+    borderRadius: 17,
+    flexDirection: 'row',
+    marginBottom: 24,
+    minHeight: 70,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  inviteButtonPressed: { backgroundColor: '#E8EFF2' },
+  inviteIcon: {
+    alignItems: 'center',
+    backgroundColor: '#FFF0D8',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  inviteTextArea: { flex: 1, marginLeft: 12 },
+  inviteTitle: { color: '#163344', fontSize: 14, fontWeight: '800' },
+  inviteDescription: { color: '#71848E', fontSize: 11, marginTop: 4 },
+  pendingBadge: {
+    backgroundColor: '#FFF0D8',
+    borderRadius: 10,
+    marginRight: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  pendingBadgeText: { color: '#9B5D10', fontSize: 10, fontWeight: '800' },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
