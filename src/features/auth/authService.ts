@@ -9,6 +9,10 @@ type Credentials = {
   password: string;
 };
 
+type SignUpCredentials = Credentials & {
+  displayName: string;
+};
+
 type AuthUserData = {
   id: string;
   email?: string;
@@ -22,7 +26,11 @@ type UserAuthResponse = {
 };
 
 type AuthClient = {
-  signUp: (credentials: Credentials) => Promise<UserAuthResponse>;
+  signUp: (credentials: {
+    email: string;
+    password: string;
+    options: { data: { display_name: string } };
+  }) => Promise<UserAuthResponse>;
   signInWithPassword: (credentials: Credentials) => Promise<UserAuthResponse>;
   signOut: (options: { scope: 'local' }) => Promise<{ error: unknown }>;
 };
@@ -96,8 +104,14 @@ const runUserAuth = async (
 };
 
 export const createAuthService = (auth: AuthClient) => ({
-  signUp: (credentials: Credentials): Promise<UserAuthResult> =>
-    runUserAuth(() => auth.signUp(credentials)),
+  signUp: (credentials: SignUpCredentials): Promise<UserAuthResult> =>
+    runUserAuth(() =>
+      auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+        options: { data: { display_name: credentials.displayName } },
+      }),
+    ),
 
   signIn: (credentials: Credentials): Promise<UserAuthResult> =>
     runUserAuth(() => auth.signInWithPassword(credentials)),

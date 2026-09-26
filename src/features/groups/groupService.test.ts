@@ -12,7 +12,23 @@ const createClient = () => {
   const maybeSingle = jest.fn();
   const eq = jest.fn(() => ({ maybeSingle }));
   const select = jest.fn(() => ({ eq, order }));
-  const from = jest.fn(() => ({ select }));
+  const profilesIn = jest.fn().mockResolvedValue({
+    data: [
+      {
+        user_id: '00000000-0000-0000-0000-000000000001',
+        display_name: 'なおき',
+      },
+      {
+        user_id: '00000000-0000-0000-0000-000000000002',
+        display_name: 'あや',
+      },
+    ],
+    error: null,
+  });
+  const profilesSelect = jest.fn(() => ({ in: profilesIn }));
+  const from = jest.fn((table: string) =>
+    table === 'profiles' ? { select: profilesSelect } : { select },
+  );
   const rpc = jest.fn();
   const getSession = jest.fn().mockResolvedValue({
     data: {
@@ -31,6 +47,8 @@ const createClient = () => {
     getSession,
     maybeSingle,
     order,
+    profilesIn,
+    profilesSelect,
     rpc,
     select,
   };
@@ -150,11 +168,13 @@ describe('createGroupService', () => {
         members: [
           {
             userId: '00000000-0000-0000-0000-000000000001',
+            displayName: 'なおき',
             role: 'owner',
             joinedAt: '2026-09-19T00:00:00.000Z',
           },
           {
             userId: '00000000-0000-0000-0000-000000000002',
+            displayName: 'あや',
             role: 'member',
             joinedAt: '2026-09-20T00:00:00.000Z',
           },
@@ -164,6 +184,42 @@ describe('createGroupService', () => {
     expect(JSON.stringify(result)).not.toContain(
       'access-token-must-not-be-returned',
     );
+  });
+
+  test('プロフィールがないメンバーは表示名をnullとして返す', async () => {
+    const { client, maybeSingle, profilesIn } = createClient();
+    maybeSingle.mockResolvedValue({
+      data: {
+        id: '40000000-0000-0000-0000-000000000001',
+        name: '家族',
+        created_by: '00000000-0000-0000-0000-000000000001',
+        created_at: '2026-09-19T00:00:00.000Z',
+        group_members: [
+          {
+            user_id: '00000000-0000-0000-0000-000000000001',
+            joined_at: '2026-09-19T00:00:00.000Z',
+          },
+        ],
+      },
+      error: null,
+    });
+    profilesIn.mockResolvedValue({ data: [], error: null });
+
+    const result = await createGroupService(client as never).getGroupDetails(
+      '40000000-0000-0000-0000-000000000001',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      group: expect.objectContaining({
+        members: [
+          expect.objectContaining({
+            userId: '00000000-0000-0000-0000-000000000001',
+            displayName: null,
+          }),
+        ],
+      }),
+    });
   });
 
   test('未ログインではグループ詳細を問い合わせない', async () => {

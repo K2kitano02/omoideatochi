@@ -19,6 +19,7 @@ type AuthScreenProps = {
 };
 
 type FieldErrors = {
+  displayName?: string;
   email?: string;
   password?: string;
 };
@@ -32,6 +33,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function AuthScreen({ authService }: AuthScreenProps) {
   const [mode, setMode] = useState<'login' | 'signUp'>('login');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -49,6 +51,16 @@ export function AuthScreen({ authService }: AuthScreenProps) {
 
     setFeedback(undefined);
 
+    if (mode === 'signUp') {
+      if (!displayName) {
+        errors.displayName = '表示名を入力してください';
+      } else if (displayName !== displayName.trim()) {
+        errors.displayName = '表示名の前後に空白を入れないでください';
+      } else if (displayName.length > 15) {
+        errors.displayName = '表示名は15文字以内で入力してください';
+      }
+    }
+
     if (!normalizedEmail) {
       errors.email = 'メールアドレスを入力してください';
     } else if (!emailPattern.test(normalizedEmail)) {
@@ -63,7 +75,7 @@ export function AuthScreen({ authService }: AuthScreenProps) {
 
     setFieldErrors(errors);
 
-    if (errors.email || errors.password) {
+    if (errors.displayName || errors.email || errors.password) {
       return;
     }
 
@@ -72,11 +84,14 @@ export function AuthScreen({ authService }: AuthScreenProps) {
 
     try {
       const service = authService ?? getAuthService();
-      const credentials = { email: normalizedEmail, password };
       const result =
         mode === 'login'
-          ? await service.signIn(credentials)
-          : await service.signUp(credentials);
+          ? await service.signIn({ email: normalizedEmail, password })
+          : await service.signUp({
+              displayName,
+              email: normalizedEmail,
+              password,
+            });
 
       if (result.ok) {
         setFeedback({
@@ -133,6 +148,35 @@ export function AuthScreen({ authService }: AuthScreenProps) {
               ? '登録したメールアドレスでログインしてください。'
               : 'メールアドレスとパスワードでアカウントを作成します。'}
           </Text>
+
+          {mode === 'signUp' ? (
+            <View style={styles.fieldGroup}>
+              <View style={styles.passwordLabelRow}>
+                <Text style={styles.label}>表示名</Text>
+                <Text style={styles.hint}>15文字以内</Text>
+              </View>
+              <TextInput
+                accessibilityLabel="表示名"
+                autoCapitalize="none"
+                editable={!isSubmitting}
+                maxLength={15}
+                onChangeText={setDisplayName}
+                placeholder="例：山田太郎"
+                placeholderTextColor="#788995"
+                selectionColor="#D69332"
+                style={[
+                  styles.input,
+                  fieldErrors.displayName && styles.inputError,
+                ]}
+                value={displayName}
+              />
+              {fieldErrors.displayName ? (
+                <Text accessibilityRole="alert" style={styles.errorText}>
+                  {fieldErrors.displayName}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>メールアドレス</Text>

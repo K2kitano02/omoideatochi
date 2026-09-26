@@ -256,17 +256,18 @@ type MemberCardProps = {
 const MemberCard = ({ member }: MemberCardProps) => {
   const isOwner = member.role === 'owner';
   const roleLabel = isOwner ? '作成者' : 'メンバー';
+  const visibleName = member.displayName ?? shortenUserId(member.userId);
 
   return (
     <View
-      accessibilityLabel={`${roleLabel} ${member.userId}`}
+      accessibilityLabel={`${roleLabel} ${visibleName}`}
       style={styles.memberCard}
     >
       <View style={isOwner ? styles.ownerMark : styles.memberMark}>
         {isOwner ? <View style={styles.ownerMarkCore} /> : null}
       </View>
       <View style={styles.memberDetails}>
-        <Text style={styles.memberId}>{shortenUserId(member.userId)}</Text>
+        <Text style={styles.memberId}>{visibleName}</Text>
         <Text style={styles.memberDescription}>
           {isOwner ? 'グループを作成したメンバー' : '参加メンバー'}
         </Text>

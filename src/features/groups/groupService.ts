@@ -9,6 +9,7 @@ export type Group = {
 
 export type GroupMember = {
   userId: string;
+  displayName: string | null;
   role: 'owner' | 'member';
   joinedAt: string;
 };
@@ -141,6 +142,11 @@ const isGroupDetailsRow = (
   Array.isArray(value.group_members) &&
   value.group_members.every(isGroupMemberRow);
 
+const isProfileRow = (value: unknown): value is Record<string, string> =>
+  isRecord(value) &&
+  typeof value.user_id === 'string' &&
+  typeof value.display_name === 'string';
+
 export const createGroupService = (client: SupabaseClient) => ({
   createGroup: async (name: string): Promise<CreateGroupResult> => {
     try {
@@ -224,6 +230,27 @@ export const createGroupService = (client: SupabaseClient) => ({
         return { ok: false, error: unexpectedFailure() };
       }
 
+      const displayNames = new Map<string, string>();
+      if (data.group_members.length > 0) {
+        try {
+          const { data: profiles, error: profileError } = await client
+            .from('profiles')
+            .select('user_id, display_name')
+            .in(
+              'user_id',
+              data.group_members.map((member) => member.user_id),
+            );
+
+          if (!profileError && Array.isArray(profiles)) {
+            profiles.filter(isProfileRow).forEach((profile) => {
+              displayNames.set(profile.user_id, profile.display_name);
+            });
+          }
+        } catch {
+          // The member list remains usable with shortened UUID fallbacks.
+        }
+      }
+
       return {
         ok: true,
         group: {
@@ -233,6 +260,7 @@ export const createGroupService = (client: SupabaseClient) => ({
           createdAt: data.created_at,
           members: data.group_members.map((member) => ({
             userId: member.user_id,
+            displayName: displayNames.get(member.user_id) ?? null,
             role: member.user_id === data.created_by ? 'owner' : 'member',
             joinedAt: member.joined_at,
           })),
