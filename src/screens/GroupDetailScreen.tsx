@@ -11,19 +11,32 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getGroupLifecycleService } from '../features/groups/groupLifecycle';
 import { getGroupService } from '../features/groups/groups';
+import type { GroupLifecycleService } from '../features/groups/groupLifecycleService';
 import type {
   GroupDetails,
   GroupFailure,
   GroupMember,
   GroupService,
 } from '../features/groups/groupService';
+import {
+  DISSOLVE_CONFIRMATION_WORD,
+  getGroupLifecycleErrorMessage,
+  GroupLifecycleConfirmationModal,
+  type PendingLifecycleAction,
+} from './GroupLifecycleConfirmationModal';
 
 type GroupDetailScreenProps = {
   currentUserId?: string;
   groupId: string;
   groupService?: Pick<GroupService, 'getGroupDetails'>;
+  lifecycleService?: Pick<
+    GroupLifecycleService,
+    'leaveGroup' | 'removeGroupMember' | 'dissolveGroup'
+  >;
   onBack: () => void;
+  onGroupUnavailable?: () => void;
   onInvite?: (params: {
     groupId: string;
     groupName: string;
@@ -44,7 +57,9 @@ export const GroupDetailScreen = ({
   currentUserId,
   groupId,
   groupService,
+  lifecycleService,
   onBack,
+  onGroupUnavailable,
   onInvite,
   pendingCount = 0,
 }: GroupDetailScreenProps) => {
@@ -57,8 +72,14 @@ export const GroupDetailScreen = ({
   const [resolvedSource, setResolvedSource] = useState<GroupDetailSource>();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingLifecycleAction>();
+  const [dissolveConfirmation, setDissolveConfirmation] = useState('');
+  const [lifecycleError, setLifecycleError] = useState<string>();
+  const [isMutating, setIsMutating] = useState(false);
   const mountedRef = useRef(true);
   const latestLoadRef = useRef(0);
+  const mutationInProgressRef = useRef(false);
+  const lifecycleGroupIdRef = useRef(groupId);
 
   const loadGroup = useCallback(async () => {
     const loadId = latestLoadRef.current + 1;
@@ -112,10 +133,97 @@ export const GroupDetailScreen = ({
     };
   }, [groupId, service]);
 
+  useEffect(() => {
+    if (lifecycleGroupIdRef.current === groupId) {
+      return;
+    }
+
+    lifecycleGroupIdRef.current = groupId;
+    setPendingAction(undefined);
+    setDissolveConfirmation('');
+    setLifecycleError(undefined);
+    mutationInProgressRef.current = false;
+    setIsMutating(false);
+  }, [groupId]);
+
   const isLoadingCurrentSource =
     isInitialLoading ||
     resolvedSource?.groupId !== groupId ||
     resolvedSource.service !== service;
+
+  const openAction = (action: PendingLifecycleAction) => {
+    setPendingAction(action);
+    setDissolveConfirmation('');
+    setLifecycleError(undefined);
+  };
+
+  const closeAction = () => {
+    if (mutationInProgressRef.current) {
+      return;
+    }
+
+    setPendingAction(undefined);
+    setDissolveConfirmation('');
+    setLifecycleError(undefined);
+  };
+
+  const confirmAction = async () => {
+    if (!pendingAction || mutationInProgressRef.current || !group) {
+      return;
+    }
+
+    if (
+      pendingAction.type === 'dissolve' &&
+      dissolveConfirmation !== DISSOLVE_CONFIRMATION_WORD
+    ) {
+      return;
+    }
+
+    mutationInProgressRef.current = true;
+    setIsMutating(true);
+    setLifecycleError(undefined);
+
+    try {
+      const lifecycle = lifecycleService ?? getGroupLifecycleService();
+      const result =
+        pendingAction.type === 'leave'
+          ? await lifecycle.leaveGroup(group.id)
+          : pendingAction.type === 'remove-member'
+            ? await lifecycle.removeGroupMember(
+                group.id,
+                pendingAction.member.userId,
+              )
+            : await lifecycle.dissolveGroup(group.id);
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      if (!result.ok) {
+        setLifecycleError(getGroupLifecycleErrorMessage(result.reason));
+        return;
+      }
+
+      const completedAction = pendingAction.type;
+      setPendingAction(undefined);
+      setDissolveConfirmation('');
+
+      if (completedAction === 'remove-member') {
+        await loadGroup();
+      } else {
+        onGroupUnavailable?.();
+      }
+    } catch {
+      if (mountedRef.current) {
+        setLifecycleError(getGroupLifecycleErrorMessage('unexpected'));
+      }
+    } finally {
+      mutationInProgressRef.current = false;
+      if (mountedRef.current) {
+        setIsMutating(false);
+      }
+    }
+  };
 
   return (
     <SafeAreaView accessibilityLabel="グループ詳細画面" style={styles.screen}>
@@ -239,21 +347,93 @@ export const GroupDetailScreen = ({
           ) : (
             <View style={styles.memberList}>
               {group.members.map((member) => (
-                <MemberCard key={member.userId} member={member} />
+                <MemberCard
+                  canRemove={
+                    group.createdBy === currentUserId && member.role !== 'owner'
+                  }
+                  disabled={isMutating}
+                  key={member.userId}
+                  member={member}
+                  onRemove={() => openAction({ type: 'remove-member', member })}
+                />
               ))}
             </View>
           )}
+
+          {currentUserId ? (
+            <View style={styles.managementSection}>
+              <Text style={styles.managementTitle}>グループ管理</Text>
+              <Pressable
+                accessibilityLabel={
+                  group.createdBy === currentUserId
+                    ? 'グループを解散'
+                    : 'グループを退出'
+                }
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isMutating }}
+                disabled={isMutating}
+                onPress={() =>
+                  openAction({
+                    type:
+                      group.createdBy === currentUserId ? 'dissolve' : 'leave',
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.dangerButton,
+                  pressed && styles.dangerButtonPressed,
+                ]}
+              >
+                <Ionicons
+                  color="#B74B43"
+                  name={
+                    group.createdBy === currentUserId
+                      ? 'trash-outline'
+                      : 'exit-outline'
+                  }
+                  size={19}
+                />
+                <Text style={styles.dangerButtonText}>
+                  {group.createdBy === currentUserId
+                    ? 'グループを解散'
+                    : 'グループを退出'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </ScrollView>
+      ) : null}
+
+      {group && pendingAction ? (
+        <GroupLifecycleConfirmationModal
+          action={pendingAction}
+          dissolveConfirmation={dissolveConfirmation}
+          error={lifecycleError}
+          groupName={group.name}
+          isProcessing={isMutating}
+          onCancel={closeAction}
+          onChangeDissolveConfirmation={setDissolveConfirmation}
+          onConfirm={() => {
+            void confirmAction();
+          }}
+        />
       ) : null}
     </SafeAreaView>
   );
 };
 
 type MemberCardProps = {
+  canRemove: boolean;
+  disabled: boolean;
   member: GroupMember;
+  onRemove: () => void;
 };
 
-const MemberCard = ({ member }: MemberCardProps) => {
+const MemberCard = ({
+  canRemove,
+  disabled,
+  member,
+  onRemove,
+}: MemberCardProps) => {
   const isOwner = member.role === 'owner';
   const roleLabel = isOwner ? '作成者' : 'メンバー';
   const visibleName = member.displayName ?? shortenUserId(member.userId);
@@ -277,6 +457,22 @@ const MemberCard = ({ member }: MemberCardProps) => {
           {roleLabel}
         </Text>
       </View>
+      {canRemove ? (
+        <Pressable
+          accessibilityLabel={`${visibleName}をグループから削除`}
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          hitSlop={8}
+          onPress={onRemove}
+          style={({ pressed }) => [
+            styles.removeMemberButton,
+            pressed && styles.removeMemberButtonPressed,
+          ]}
+        >
+          <Ionicons color="#A5453E" name="person-remove-outline" size={18} />
+        </Pressable>
+      ) : null}
     </View>
   );
 };
@@ -530,6 +726,50 @@ const styles = StyleSheet.create({
   },
   ownerRoleText: {
     color: '#9B5D10',
+  },
+  removeMemberButton: {
+    alignItems: 'center',
+    backgroundColor: '#FBECE9',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    marginLeft: 9,
+    width: 32,
+  },
+  removeMemberButtonPressed: {
+    backgroundColor: '#F2D3CF',
+  },
+  managementSection: {
+    borderTopColor: '#315365',
+    borderTopWidth: 1,
+    marginTop: 28,
+    paddingTop: 20,
+  },
+  managementTitle: {
+    color: '#AFC2CF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  dangerButton: {
+    alignItems: 'center',
+    backgroundColor: '#FBECE9',
+    borderColor: '#E5B8B3',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  dangerButtonPressed: {
+    backgroundColor: '#F5DCD8',
+  },
+  dangerButtonText: {
+    color: '#973E38',
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 8,
   },
   emptyCard: {
     alignItems: 'center',

@@ -60,6 +60,12 @@ const GroupDetailsRoute = ({
     currentUserId={currentUserId}
     groupId={route.params.groupId}
     onBack={() => navigation.goBack()}
+    onGroupUnavailable={() => {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'GroupsList' }],
+      });
+    }}
     onInvite={(params) => {
       navigation.navigate('GroupInvitation', params);
     }}
