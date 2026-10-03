@@ -10,6 +10,20 @@ const mockGetMyProfile = jest.fn();
 const mockSaveDisplayName = jest.fn();
 
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
+jest.mock('../src/features/friends/friends', () => ({
+  getFriendService: () => ({
+    getMyFriendCode: jest
+      .fn()
+      .mockResolvedValue({ ok: true, code: '0123456789ABCDEF' }),
+    listReceivedFriendRequests: jest
+      .fn()
+      .mockResolvedValue({ ok: true, requests: [] }),
+    listSentFriendRequests: jest
+      .fn()
+      .mockResolvedValue({ ok: true, requests: [] }),
+    listFriends: jest.fn().mockResolvedValue({ ok: true, friends: [] }),
+  }),
+}));
 jest.mock('../src/features/profile/profiles', () => ({
   getProfileService: () => ({
     getMyProfile: mockGetMyProfile,
@@ -272,6 +286,20 @@ describe('<AppContent />', () => {
     expect(screen.getByText('3')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('グループタブ、承認待ち3件'));
     expect(await screen.findByText('承認待ち 3件')).toBeTruthy();
+  });
+
+  test('フレンドタブからコードと一覧を開き、地図へ戻れる', async () => {
+    const { authClient, emit } = createAuthClient();
+    await render(<AppContent authClient={authClient} />);
+    await emit(session);
+    await fireEvent.press(screen.getByLabelText('フレンドタブ'));
+    expect(await screen.findByLabelText('フレンド画面')).toBeTruthy();
+    expect(await screen.findByText('0123456789ABCDEF')).toBeTruthy();
+    expect(screen.queryByText('家族')).toBeNull();
+    expect(screen.queryByText(session.user.id)).toBeNull();
+    expect(screen.queryByText(session.user.email!)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('地図タブ'));
+    expect(screen.getByLabelText('地図画面')).toBeTruthy();
   });
 
   test('グループ一覧から詳細へ移動し、一覧へ戻れる', async () => {

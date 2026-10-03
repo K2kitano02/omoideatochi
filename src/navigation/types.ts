@@ -1,6 +1,7 @@
 export type AuthenticatedTabParamList = {
   Map: undefined;
   Groups: undefined;
+  Friends: undefined;
   Collection: undefined;
   Settings: undefined;
 };
