@@ -1,6 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { DarkTheme, NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme,
+  NavigationContainer,
+  useIsFocused,
+} from '@react-navigation/native';
 
 import type { AuthSessionUser } from '../features/auth/useAuthSession';
 import type { SaveProfileResult } from '../features/profile/profileService';
@@ -8,6 +12,7 @@ import { useOwnedGroupPendingCounts } from '../features/groups/useOwnedGroupPend
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { MapScreen } from '../screens/MapScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { FriendsScreen } from '../screens/FriendsScreen';
 import { GroupsNavigator } from './GroupsNavigator';
 import type { AuthenticatedTabParamList } from './types';
 
@@ -43,9 +48,12 @@ const tabIcons: Record<
 > = {
   Map: { focused: 'map', unfocused: 'map-outline' },
   Groups: { focused: 'people', unfocused: 'people-outline' },
+  Friends: { focused: 'person-add', unfocused: 'person-add-outline' },
   Collection: { focused: 'albums', unfocused: 'albums-outline' },
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
+
+const FriendsRoute = () => <FriendsScreen isFocused={useIsFocused()} />;
 
 export const AuthenticatedNavigator = ({
   user,
@@ -115,6 +123,7 @@ export const AuthenticatedNavigator = ({
           )}
         </Tab.Screen>
         <Tab.Screen component={CollectionScreen} name="Collection" />
+        <Tab.Screen component={FriendsRoute} name="Friends" />
         <Tab.Screen name="Settings">
           {() => (
             <SettingsScreen
@@ -136,6 +145,7 @@ const getTabLabel = (routeName: keyof AuthenticatedTabParamList) => {
   const labels: Record<keyof AuthenticatedTabParamList, string> = {
     Map: '地図',
     Groups: 'グループ',
+    Friends: 'フレンド',
     Collection: 'コレクション',
     Settings: '設定',
   };
