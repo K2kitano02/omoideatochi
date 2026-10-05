@@ -9,13 +9,19 @@ from (values ('memory_photos'), ('memory_posts')) as tables(table_name)
 join pg_class on oid = ('public.' || table_name)::regclass;
 
 select ok(
-  not exists (
+  (select count(*) = 0
+   from pg_policy where polrelid = 'public.memory_photos'::regclass),
+  'photos have no client access policy'
+);
+select ok(
+  exists (
     select 1 from pg_policy
-    where polrelid = ('public.' || table_name)::regclass
+    where polrelid = 'public.memory_posts'::regclass
+      and polname = 'memory_posts_select_author_or_member'
+      and polcmd = 'r'
   ),
-  table_name || ' has no initial access policy'
-)
-from (values ('memory_photos'), ('memory_posts')) as tables(table_name);
+  'posts have a read-only author or current member policy'
+);
 
 select ok(
   not has_table_privilege(role_name, 'public.' || table_name, privilege_name),
@@ -56,11 +62,11 @@ select throws_ok($$delete from public.memory_photos$$, '42501', null, 'authentic
 select throws_ok($$delete from public.memory_posts$$, '42501', null, 'authenticated post deletion is denied');
 reset role;
 
--- Defense in depth: granting SELECT in this rolled-back test still exposes no rows.
+-- Defense in depth: granting SELECT here still allows only authorized posts.
 grant select on public.memory_photos, public.memory_posts to authenticated;
 set local role authenticated;
 select is((select count(*) from public.memory_photos), 0::bigint, 'RLS hides photos even if SELECT is accidentally granted');
-select is((select count(*) from public.memory_posts), 0::bigint, 'RLS hides posts even if SELECT is accidentally granted');
+select is((select count(*) from public.memory_posts), 1::bigint, 'RLS permits only the owner personal post if SELECT is granted');
 reset role;
 
 select * from finish();
