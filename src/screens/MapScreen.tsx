@@ -1,36 +1,45 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export const MapScreen = () => (
-  <SafeAreaView accessibilityLabel="地図画面" style={styles.screen}>
-    <View style={styles.header}>
-      <Text style={styles.eyebrow}>MEMORY MAP</Text>
-      <Text accessibilityRole="header" style={styles.title}>
-        思い出の地図
-      </Text>
-      <Text style={styles.description}>
-        自分が残した思い出を、ここからいつでも振り返れます。
-      </Text>
-    </View>
+import type { GoogleMap } from '../components/GoogleMap';
+import { getMapAvailability } from '../config/maps';
 
-    <View style={styles.mapPlaceholder}>
-      <View accessibilityElementsHidden style={styles.locationMark}>
-        <View style={styles.ringOuter} />
-        <View style={styles.ringInner} />
-        <View style={styles.pin}>
-          <Ionicons color="#0B2638" name="camera" size={20} />
-        </View>
+let NativeGoogleMap: typeof GoogleMap | undefined;
+
+export const MapScreen = ({ isFocused = true }: { isFocused?: boolean }) => {
+  const availability = getMapAvailability();
+  // Native maps enforce module availability at import time. Do not import them
+  // while showing the Expo Go / missing-key / unsupported fallback.
+  const MapComponent =
+    availability.status === 'ready' && isFocused
+      ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer native module enforcement until maps are usable.
+        (NativeGoogleMap ??= require('../components/GoogleMap').GoogleMap)
+      : undefined;
+  return (
+    <SafeAreaView accessibilityLabel="地図画面" style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>MEMORY MAP</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          思い出の地図
+        </Text>
+        <Text style={styles.description}>
+          自分が残した思い出を、ここからいつでも振り返れます。
+        </Text>
       </View>
-      <Text style={styles.placeholderTitle}>
-        地図は次のステップで追加します
-      </Text>
-      <Text style={styles.placeholderText}>
-        今回は、各画面へ安全に移動するための土台を作っています。
-      </Text>
-    </View>
-  </SafeAreaView>
-);
+
+      <View style={styles.mapContainer}>
+        {availability.status === 'ready' ? (
+          MapComponent && <MapComponent />
+        ) : (
+          <View style={styles.notice}>
+            <Text style={styles.placeholderTitle}>地図を表示するには</Text>
+            <Text style={styles.placeholderText}>{availability.message}</Text>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+};
 
 const styles = StyleSheet.create({
   screen: {
@@ -60,52 +69,19 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 10,
   },
-  mapPlaceholder: {
-    alignItems: 'center',
+  mapContainer: {
     backgroundColor: '#F6F9FA',
     borderRadius: 28,
     flex: 1,
-    justifyContent: 'center',
     marginBottom: 20,
     marginTop: 28,
-    paddingHorizontal: 30,
+    overflow: 'hidden',
   },
-  locationMark: {
+  notice: {
     alignItems: 'center',
-    height: 132,
+    flex: 1,
     justifyContent: 'center',
-    marginBottom: 26,
-    width: 132,
-  },
-  ringOuter: {
-    borderColor: 'rgba(231, 168, 75, 0.28)',
-    borderRadius: 66,
-    borderWidth: 2,
-    height: 132,
-    position: 'absolute',
-    width: 132,
-  },
-  ringInner: {
-    borderColor: 'rgba(231, 168, 75, 0.55)',
-    borderRadius: 43,
-    borderWidth: 2,
-    height: 86,
-    position: 'absolute',
-    width: 86,
-  },
-  pin: {
-    alignItems: 'center',
-    backgroundColor: '#E7A84B',
-    borderColor: '#FFE1A8',
-    borderRadius: 25,
-    borderWidth: 4,
-    height: 50,
-    justifyContent: 'center',
-    shadowColor: '#E7A84B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    width: 50,
+    padding: 30,
   },
   placeholderTitle: {
     color: '#102B3D',
