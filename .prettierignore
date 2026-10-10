@@ -1,4 +1,7 @@
 .expo/
+.superpowers/
+android/
+ios/
 coverage/
 dist/
 node_modules/

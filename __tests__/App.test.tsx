@@ -10,6 +10,13 @@ const mockGetMyProfile = jest.fn();
 const mockSaveDisplayName = jest.fn();
 
 jest.mock('expo-sqlite/localStorage/install', () => ({}));
+jest.mock('../src/config/maps', () => ({
+  getMapAvailability: () => ({ status: 'ready' }),
+}));
+jest.mock('react-native-maps', () => {
+  const { View } = jest.requireActual('react-native');
+  return { __esModule: true, default: View, PROVIDER_GOOGLE: 'google' };
+});
 jest.mock('../src/features/friends/friends', () => ({
   getFriendService: () => ({
     getMyFriendCode: jest
@@ -250,19 +257,27 @@ describe('<AppContent />', () => {
     expect(screen.queryByLabelText('メールアドレス')).toBeNull();
   });
 
-  test('認証済みタブから各プレースホルダーへ移動して地図へ戻れる', async () => {
+  test('地図読み込み中でも各タブへ移動でき、戻ると地図を再生成する', async () => {
     const { authClient, emit } = createAuthClient();
     await render(<AppContent authClient={authClient} />);
     await emit(session);
+    const initialReady = screen.getByLabelText('Google Maps').props.onMapReady;
+    expect(screen.getByText('地図を読み込んでいます…')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('グループタブ'));
     expect(screen.getByLabelText('グループ画面')).toBeTruthy();
+    expect(
+      screen.queryByLabelText('Google Maps', { includeHiddenElements: true }),
+    ).toBeNull();
 
     await fireEvent.press(screen.getByLabelText('コレクションタブ'));
     expect(screen.getByLabelText('コレクション画面')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('地図タブ'));
     expect(screen.getByLabelText('地図画面')).toBeTruthy();
+    expect(screen.getByLabelText('Google Maps').props.onMapReady).not.toBe(
+      initialReady,
+    );
   });
 
   test('承認待ち件数をグループタブと対象グループへ表示する', async () => {

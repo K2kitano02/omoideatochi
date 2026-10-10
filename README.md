@@ -14,9 +14,76 @@
 
 - `npm install` — ロックファイルに従って依存関係をインストールする。
 - `npm run start` — Expo開発サーバーを起動する。
+- `npm run start:go` — Expo Go用に開発サーバーを起動する（地図は開発ビルドの案内のみ）。
+- `npm run start:dev` — インストール済みの専用開発ビルドへ接続する。
+- `npm run build:ios` — XcodeでiOS専用開発ビルドを生成し、起動する。
+- `npm run build:android` — Android SDKでAndroid専用開発ビルドを生成し、起動する。
 - `npm run lint` — Expo・React Native・TypeScript向けのLintを実行する。
 - `npm run format:check` — Prettierのフォーマット規約への適合を確認する。
 - `npm run typecheck` — ファイルを生成せずにTypeScriptの型を検査する。
+
+### Google Mapsの開発ビルド
+
+Issue34は基本地図の表示・パン・ズームまでを扱う。東京駅周辺の公開の固定地点から表示し、現在地・投稿座標・位置権限・移動履歴は取得しない。投稿マーカーやクラスタリングは後続Issueで追加する。iOS・AndroidともGoogle Mapsを指定し、Apple Mapsへ切り替えて問題を回避しない。
+
+Expo Goは共通のネイティブアプリであり、このプロジェクト専用のキーやネイティブ設定の検証には使わない。地図タブは案内だけを表示し、ほかのタブは利用できる。Webでもネイティブ地図を生成しない。専用開発ビルドはこのアプリ用のネイティブ機能・設定を組み込んだテスト用アプリである。
+
+#### キーの制限と料金の境界
+
+- Google Cloudプロジェクトへ有効な請求先を紐付け、Maps SDK for iOS／Maps SDK for Androidを有効化する。
+- iOSキーはiOSアプリ制限を付け、bundle identifierを`com.k2kitano02.omoideatochi`にする。API制限はMaps SDK for iOSだけにする。
+- AndroidキーはAndroidアプリ制限を付け、packageを`com.k2kitano02.omoideatochi`にする。使用するビルドの署名証明書SHA-1を登録し、API制限はMaps SDK for Androidだけにする。開発用署名と配布用署名は別なので、公開時には再確認する。
+- キーはOS別に分け、制限なしキーで動作確認しない。キーはアプリから取り出され得る。`.env`はGitへの誤公開を防ぐ手段であり、配布後の秘密保持手段ではない。
+- Map IDを設定しない。2026-10-10確認時点で、Map IDなしのMaps SDK基本地図は回数無制限の無料対象だが、請求先の有効化は必要。Street View・Places・住所変換・経路検索・Maps JavaScript APIは使わない。Map IDや別APIの追加まで無料と保証しない。
+- アプリ制限・API制限だけで悪用を完全に防げるとは扱わない。Google Cloudの利用状況を確認し、意図しない利用時はキーを停止・交換し、再ビルドする。予算通知は課金を自動停止する上限ではない。
+- 将来有料APIを追加する場合は、別キー・サーバー経由・料金対策を別Issueで検討する。このキーの許可APIを安易に拡張しない。MapsキーでSupabase投稿の閲覧権限を与えず、既存認証・RLSは別に維持する。
+
+参照: [Googleのキー保護方針](https://developers.google.com/maps/api-security-best-practices)、[Maps SDKの課金対象](https://developers.google.com/maps/billing-and-pricing/sku-details#maps-sdk)、[料金表](https://developers.google.com/maps/billing-and-pricing/pricing)、[iOSの請求先要件](https://developers.google.com/maps/documentation/ios-sdk/usage-and-billing)。料金やSDK条件は導入・公開時にも確認する。
+
+#### ローカル設定と起動
+
+1. Node.js 22.18以上を使用する。`app.config.ts`が参照するTypeScript設定ファイルをNodeの型除去機能で読み込むため必要である。依存は`npm install`で導入する。
+2. Git管理外の`.env`へ、`.env.example`にある`GOOGLE_MAPS_IOS_API_KEY`と`GOOGLE_MAPS_ANDROID_API_KEY`を設定する。既存のSupabase設定は残す。片方だけ設定した場合、未設定OSでは地図キー設定の案内を表示する。キー全文をチャット・Issue・PR・ログへ貼らない。
+3. iOSはXcodeの初回設定・CocoaPodsを準備する。生成済みの`ios/`がある場合は、キー設定後に手動変更・署名設定を退避し、`npx expo prebuild --platform ios --no-install`でネイティブ設定へ反映する。シミュレーターでは`npm run build:ios`、接続したiPhoneを選ぶ場合は`npm run build:ios -- --device`を使う。実機の開発者モード・信頼設定・Appleアカウントによる署名は利用者が確認する。ローカル実機確認のためだけに有料Apple会員へ自動加入しない。
+4. AndroidはJDK 17、Android Studio、Android SDKのplatform／build-tools／platform-tools／command-line tools／emulatorを準備する。規約への同意は利用者が行う。ビルドが要求するSDKバージョンを揃え、実機またはGoogle Play対応のARM64仮想端末を用意する。`JAVA_HOME`、`ANDROID_HOME`とSDKへのPATHは自分の配置に合わせ、既存シェル設定を上書きしない。
+5. Androidの署名確認用に`npx expo prebuild --platform android --no-install`で生成し、`cd android`の後に`./gradlew signingReport`で開発ビルドのSHA-1をローカルで確認する。署名の秘密鍵を公開しない。CloudへpackageとSHA-1を登録したAndroidキーを`.env`に入力する。手動変更・署名設定を退避したうえで、リポジトリ直下から再度`npx expo prebuild --platform android --no-install`を実行してキーをネイティブ設定へ反映し、`npm run build:android`を実行する。
+6. ビルド済みアプリのJSだけを更新する際は`npm run start:dev`を使用する。停止にはターミナルでCtrl+Cを使う。起動した仮想端末も確認後に終了する。
+
+生成される`ios/`・`android/`、実キーの`.env`、署名秘密鍵はGit管理外である。キーはビルド時にnative pluginへ渡し、独自の`extra.googleMaps`には各OSの設定済みフラグだけを入れる。`EXPO_PUBLIC_`のMapsキーは追加しない。設定・ビルドログはキーを含む可能性があるため、そのまま共有しない。
+
+キー、アプリ識別子、config plugin、ネイティブ依存を変更した場合は、対象OSのprebuildでネイティブ設定を同期してから再ビルドする。`ios/`・`android/`が既にあると`expo run:*`は通常prebuildを省略するため、ビルドだけでは設定変更が反映されない。手動変更や署名設定を事前に退避し、無条件の`--clean`で削除しない。prebuildが`package.json`の起動scriptを変更した場合は差分を確認し、既存の`ios`・`android`と専用の`build:*`の役割を保つ。開発サーバーの再起動やJS更新だけではインストール済みアプリのキーは更新されない。設定済みフラグも、ネイティブ機能やキーが最新のビルドへ反映されたことを保証しない。
+
+Xcode 27／iOS 27では画面の起動にUIScene方式が必要なため、Expo 57.0.23以降と`expo-build-properties`の`ios.enableSceneSupport: true`を使用する。SDK 58への更新は行わない。古い生成済み`ios/`がある場合は、手動変更や署名設定を退避してからiOSだけを再生成し、再ビルドする。Androidの署名ファイルを巻き込まない。[Expo公式のSDK 57対応手順](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md#staying-on-sdk-57-with-xcode-27)を参照する。
+
+Android Studioの同梱Javaと、ターミナルの`JAVA_HOME`は別に選択される場合がある。今回の環境ではターミナルのJDK 17でビルドが成功した一方、Android StudioのJDK 25ではCMake／Prefabの同期に失敗した。このプロジェクトのGradle実行用Javaを17に揃えて解消した。生成済みの`android/gradle/gradle-daemon-jvm.properties`がある場合、その`toolchainVersion`も確認する。この指定は`JAVA_HOME`より優先されるため、Mac全体のJava設定を変えるだけでは解消しない。[GradleのDaemon JVM設定](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria)を参照する。
+
+#### 地図が出ない場合と検証範囲
+
+- キー未設定／Expo Go／Webは画面の案内に従う。古い専用ビルドでネイティブ機能が不足する場合は再ビルドする。JSだけで任意のネイティブ障害を防げるとは保証しない。
+- 準備完了まで15秒以上かかる場合は案内を表示する。「地図を再読み込み」で地図を作り直せる。タブを離れると地図と待機タイマーを破棄する。地図タブへ戻ると東京駅周辺の初期位置・倍率へ戻る。表示位置・倍率の保持は今回の対象外である。
+- `onMapReady`はSDKの準備完了であり、Googleのキー認証やタイル表示成功の証明ではない。空の地図でも通知される場合がある。読み込み表示が消えても、実際のタイルを目で確認する。
+- 空の地図は通信、請求先、SDK有効化、OS別のキー制限、iOS識別子／Android package・署名SHA-1と、キー変更後の再ビルドを確認する。Xcode／Android Studioのネイティブログも確認するが、キー・認証情報は共有前に伏せる。原因を推測してAPI制限を外さない。
+- 各OSの専用開発ビルドでタイル・パン／ズーム・Google帰属表示・タブ移動と復帰・ログアウトを確認する。案内や再試行ボタンは地図外に配置し、帰属表示を覆わない。
+
+Jestのnative SDK代替を使ったテストは、設定判定・描画引数・待機／再試行・タブ切替の回帰を検証するもので、地図タイルの実表示は証明しない。Issue34ではiOS 27シミュレーターの開発ビルドでタイル表示・パン／ズーム・タブ復帰・再読み込みを確認済み。AndroidのGoogle Play対応ARM64仮想端末でも利用者が地図表示と操作を確認し、両OSでの確認完了を報告した。iPhone・Androidの物理実機での確認は未実施であり、仮想端末の結果で実機確認を代替したとは扱わない。OSごとの実施範囲をIssue／PRに記録する。
+
+参照: [Expoの地図設定](https://docs.expo.dev/versions/latest/sdk/map-view/)、[ローカル開発ビルド](https://docs.expo.dev/guides/local-app-development/)、[Android環境の準備](https://docs.expo.dev/workflow/android-studio-emulator/)。
+
+### 依存ソフトウェアの安全性と継続対応
+
+アプリの開発には、外部のソフトウェア部品も使用している。2026-10-10の確認では、依存関係の監査にCritical 0件・High 46件・Moderate 12件の警告が残っている。これらは同じ問題が関連する複数の部品に数えられる場合があり、58種類の独立した問題や、58通りの個人情報漏えいが確認されたという意味ではない。件数は監査情報の更新でも変わる。
+
+修正できる問題には対応する一方、更新によってアプリが動かなくなることや、独自修正によって別の問題を作ることも避ける。そのため、次の理由で対応を分けている。
+
+- 対応済み: `brace-expansion`と、先に検出された`shell-quote`の問題は、現在の構成と互換性がある公式修正版へ更新した。通常の動作と、問題の再発を防ぐテストを確認している。
+- 修正版待ち: `braces`・`node-forge`・`sprintf-js`には、確認時点で公式の修正版がない。現在どこで使用されるかを調べ、開発ツールへ信頼できない入力・設定・証明書を持ち込まない運用にしている。暗号処理へ独自修正を加えたり、安全確認を無効にしたりはしない。この対応はリスクを減らすもので、修正完了ではない。
+- 互換性を確認してから更新: `uuid`については、警告対象の使い方が今回確認した使用経路とは異なっていた。大きなバージョン変更を強制すると、依存する開発基盤が正常に動かなくなる可能性があるため、現時点では強制更新しない。確認していない使用経路まで安全と断定しない。
+
+今回の調査では、写真・メモなどのアプリ入力からこれらの警告対象処理へ到達する経路は確認できていない。ただし、個人情報漏えいの可能性がゼロであることや、開発ツール全体の安全性を証明したものではない。開発用サーバーは信頼できるローカル環境で使い、インターネットへ直接公開しない。`npm audit fix --force`による一括強制更新は行わない。
+
+依存関係の更新時とアプリの公開前に、公式修正版の有無と開発基盤との互換性を再確認する。新しい入力経路・署名機能の追加や、影響範囲が変わる情報が判明した場合も判断を見直す。公開前には残るリスクを改めて評価し、必要な対策が済んでいない状態を「安全確認済み」と扱わない。
+
+公開文書には対応状況と判断理由を記載し、実キー・認証情報・利用者データ・具体的な攻撃手順は記載しない。説明を省くこと自体を安全対策とは考えない。
 
 ### Supabaseローカル開発
 
