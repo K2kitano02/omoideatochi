@@ -15,8 +15,30 @@ jest.mock('../src/config/maps', () => ({
 }));
 jest.mock('react-native-maps', () => {
   const { View } = jest.requireActual('react-native');
-  return { __esModule: true, default: View, PROVIDER_GOOGLE: 'google' };
+  return {
+    __esModule: true,
+    default: View,
+    Marker: View,
+    PROVIDER_GOOGLE: 'google',
+  };
 });
+jest.mock('../src/features/memories/memories', () => ({
+  getMemoryService: () => ({
+    createReadScope: () => {
+      const scope = jest
+        .requireActual('../src/features/memories/memoryReadScope')
+        .createMemoryReadScope();
+      return {
+        ...scope,
+        listMapPosts: () =>
+          scope.run(async () => ({
+            ok: true,
+            data: { posts: [], nextCursor: null },
+          })),
+      };
+    },
+  }),
+}));
 jest.mock('../src/features/friends/friends', () => ({
   getFriendService: () => ({
     getMyFriendCode: jest
