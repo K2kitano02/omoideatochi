@@ -54,7 +54,9 @@ const tabIcons: Record<
 };
 
 const FriendsRoute = () => <FriendsScreen isFocused={useIsFocused()} />;
-const MapRoute = () => <MapScreen isFocused={useIsFocused()} />;
+const MapRoute = ({ currentUserId }: { currentUserId: string }) => (
+  <MapScreen currentUserId={currentUserId} isFocused={useIsFocused()} />
+);
 
 export const AuthenticatedNavigator = ({
   user,
@@ -113,7 +115,9 @@ export const AuthenticatedNavigator = ({
           };
         }}
       >
-        <Tab.Screen component={MapRoute} name="Map" />
+        <Tab.Screen name="Map">
+          {() => <MapRoute currentUserId={user.id} />}
+        </Tab.Screen>
         <Tab.Screen name="Groups">
           {() => (
             <GroupsNavigator

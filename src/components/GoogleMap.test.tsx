@@ -10,8 +10,32 @@ import { GoogleMap } from './GoogleMap';
 
 jest.mock('react-native-maps', () => {
   const { View } = jest.requireActual('react-native');
-  return { __esModule: true, default: View, PROVIDER_GOOGLE: 'google' };
+  return {
+    __esModule: true,
+    default: View,
+    Marker: View,
+    PROVIDER_GOOGLE: 'google',
+  };
 });
+
+const mapPosts = [
+  {
+    id: 'one',
+    kind: 'personal' as const,
+    groupId: null,
+    latitude: 35.681236,
+    longitude: 139.767125,
+    createdAt: '2026-10-10T00:00:00Z',
+  },
+  {
+    id: 'two',
+    kind: 'personal' as const,
+    groupId: null,
+    latitude: 35.681237,
+    longitude: 139.767126,
+    createdAt: '2026-10-10T00:00:00Z',
+  },
+];
 
 describe('GoogleMap', () => {
   beforeEach(() => jest.useFakeTimers());
@@ -87,5 +111,30 @@ describe('GoogleMap', () => {
     expect(clear).toHaveBeenCalledWith(timer);
     schedule.mockRestore();
     clear.mockRestore();
+  });
+
+  it('投稿を件数付きで集約し、ズーム後は個別に表示する', async () => {
+    await render(<GoogleMap posts={mapPosts} />);
+    const map = screen.getByLabelText('Google Maps');
+    await fireEvent(map, 'layout', {
+      nativeEvent: { layout: { width: 400, height: 400 } },
+    });
+    expect(screen.getByLabelText('自分の投稿、2件')).toBeOnTheScreen();
+    await fireEvent(map, 'regionChangeComplete', {
+      latitude: 35.681236,
+      longitude: 139.767125,
+      latitudeDelta: 0.0001,
+      longitudeDelta: 0.0001,
+    });
+    expect(screen.getAllByLabelText('自分の投稿、1件')).toHaveLength(2);
+  });
+
+  it('投稿が除去されると対応マーカーも消え、投稿本文を地図へ渡さない', async () => {
+    const view = await render(<GoogleMap posts={mapPosts} />);
+    const marker = screen.getAllByLabelText('自分の投稿、1件')[0];
+    expect(marker.props.title).toBeUndefined();
+    expect(marker.props.description).toBeUndefined();
+    await view.rerender(<GoogleMap posts={[]} />);
+    expect(screen.queryByLabelText('自分の投稿、1件')).toBeNull();
   });
 });
