@@ -61,7 +61,7 @@ describe('GoogleMap', () => {
     expect(map.props.showsPointsOfInterests).toBe(false);
   });
 
-  it('SDK準備完了で待機を終了しても、通信・キー確認の案内を残す', async () => {
+  it('SDK準備完了で待機を終了し、通常時の説明を表示しない', async () => {
     const schedule = jest.spyOn(globalThis, 'setTimeout');
     const clear = jest.spyOn(globalThis, 'clearTimeout');
     await render(<GoogleMap />);
@@ -73,10 +73,36 @@ describe('GoogleMap', () => {
     await act(() => screen.getByLabelText('Google Maps').props.onMapReady());
     await act(() => jest.advanceTimersByTime(0));
     expect(screen.queryByText('地図を読み込んでいます…')).toBeNull();
-    expect(screen.getByText(/通信・APIキー制限・課金設定/)).toBeOnTheScreen();
+    expect(screen.queryByText(/通信・APIキー制限・課金設定/)).toBeNull();
     expect(clear).toHaveBeenCalledWith(timer);
     schedule.mockRestore();
     clear.mockRestore();
+  });
+
+  it('再読み込みの隣に撮影接続前の無効な投稿ボタンを配置する', async () => {
+    await render(<GoogleMap />);
+    expect(
+      screen.getByRole('button', { name: '地図を再読み込み' }),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByRole('button', { name: '投稿', disabled: true }),
+    ).toBeOnTheScreen();
+  });
+  it('撮影導線が渡された場合は地図を作り直さず投稿を開始する', async () => {
+    let opened = false;
+    await render(
+      <GoogleMap
+        onCapture={() => {
+          opened = true;
+        }}
+      />,
+    );
+    await fireEvent(screen.getByLabelText('Google Maps'), 'mapReady');
+    await fireEvent.press(
+      screen.getByRole('button', { name: '投稿', disabled: false }),
+    );
+    expect(opened).toBe(true);
+    expect(screen.queryByText('地図を読み込んでいます…')).toBeNull();
   });
 
   it('15秒で案内し、再試行後に旧イベントが届いても新しい待機を終了しない', async () => {

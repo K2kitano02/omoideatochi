@@ -23,6 +23,7 @@ import type {
   ProfileService,
 } from './src/features/profile/profileService';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
+import { initializeCaptureCache } from './src/features/capture/captureRuntime';
 
 type AppProps = {
   authClient?: AuthStateClient;
@@ -36,6 +37,11 @@ export const AppContent = ({
   profileService,
 }: AppProps = {}) => {
   const authSession = useAuthSession(authClient);
+  useEffect(() => {
+    void initializeCaptureCache().catch(() => {
+      console.warn('一時写真の清掃に失敗しました。撮影前に再試行します。');
+    });
+  }, []);
   const [profile, setProfile] = useState<Profile | null>();
   const [profileError, setProfileError] = useState<string>();
   const [profileRequest, setProfileRequest] = useState(0);

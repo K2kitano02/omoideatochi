@@ -11,6 +11,7 @@ import type { MemoryMapPost } from '../features/memories/memoryTypes';
 type GoogleMapProps = {
   posts?: readonly MemoryMapPost[];
   groupIds?: readonly string[];
+  onCapture?: () => void;
 };
 const emptyPosts: readonly MemoryMapPost[] = [];
 const emptyIds: readonly string[] = [];
@@ -33,6 +34,7 @@ const MapAttempt = ({
   onRetry,
   posts,
   groupIds,
+  onCapture,
 }: GoogleMapProps & { onRetry: () => void }) => {
   const mapRef = useRef<MapView>(null);
   const [region, setRegion] = useState<MapRegion>(initialRegion);
@@ -132,18 +134,19 @@ const MapAttempt = ({
           );
         })}
       </MapView>
-      <View accessibilityLiveRegion="polite" style={styles.help}>
-        {status === 'loading' && (
-          <Text style={styles.status}>地図を読み込んでいます…</Text>
-        )}
-        {status === 'timeout' && (
-          <Text style={styles.status}>
-            地図の読み込みに時間がかかっています。
-          </Text>
-        )}
-        <Text style={styles.description}>
-          表示されない場合は、通信・APIキー制限・課金設定を確認してください。
-        </Text>
+      {status !== 'ready' && (
+        <View accessibilityLiveRegion="polite" style={styles.statusBar}>
+          {status === 'loading' && (
+            <Text style={styles.status}>地図を読み込んでいます…</Text>
+          )}
+          {status === 'timeout' && (
+            <Text style={styles.status}>
+              地図の読み込みに時間がかかっています。
+            </Text>
+          )}
+        </View>
+      )}
+      <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
           onPress={onRetry}
@@ -151,12 +154,33 @@ const MapAttempt = ({
         >
           <Text style={styles.retryText}>地図を再読み込み</Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="投稿"
+          accessibilityHint={
+            onCapture
+              ? 'カメラで思い出を撮影します。'
+              : '撮影機能の準備中です。'
+          }
+          accessibilityState={{ disabled: !onCapture }}
+          disabled={!onCapture}
+          onPress={onCapture}
+          style={[styles.retry, !onCapture && styles.capture]}
+        >
+          <Text style={onCapture ? styles.retryText : styles.captureText}>
+            投稿
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
 };
 
-export const GoogleMap = ({ posts, groupIds }: GoogleMapProps = {}) => {
+export const GoogleMap = ({
+  posts,
+  groupIds,
+  onCapture,
+}: GoogleMapProps = {}) => {
   const [attempt, setAttempt] = useState(0);
   return (
     <MapAttempt
@@ -164,6 +188,7 @@ export const GoogleMap = ({ posts, groupIds }: GoogleMapProps = {}) => {
       onRetry={() => setAttempt((value) => value + 1)}
       posts={posts}
       groupIds={groupIds}
+      onCapture={onCapture}
     />
   );
 };
@@ -183,15 +208,20 @@ const styles = StyleSheet.create({
   },
   markerLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
   markerCount: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
-  help: { padding: 14, gap: 8 },
+  statusBar: { paddingHorizontal: 10, paddingTop: 6 },
+  actions: { flexDirection: 'row', gap: 10, padding: 8 },
   status: { color: '#102B3D', fontSize: 13, fontWeight: '700' },
-  description: { color: '#596D79', fontSize: 12, lineHeight: 18 },
   retry: {
-    alignSelf: 'flex-start',
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
     backgroundColor: '#E7A84B',
   },
+  capture: { backgroundColor: '#E3E9EC' },
+  captureText: { color: '#687D89', fontSize: 13, fontWeight: '700' },
   retryText: { color: '#102B3D', fontSize: 13, fontWeight: '700' },
 });
